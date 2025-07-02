@@ -20,10 +20,15 @@ do
 done
 
 echo "=== Checking modules for migrations ==="
-echo "$SR_MODULES"
+echo "MODULES: $SR_MODULES"
+echo "======================================="
+export POSTGRES_HOST=$POSTGRES_HOST
+export POSTGRES_PORT=$POSTGRES_PORT
+export POSTGRES_USER=$POSTGRES_USER
+export POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 for module in $SR_MODULES
 do
-   echo "MIGRATING $module..."
    export POSTGRES_DB_NAME=$DB_PREFIX${module/$SR_MODULE_DIR_PREFIX/}
+   echo "=> MIGRATING $module INTO $POSTGRES_DB_NAME"
    eval "${SR_MIGRATION_PATH/SR_MODULE_FOLDER/$module} migrate"
 done

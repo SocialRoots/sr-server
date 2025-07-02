@@ -1,5 +1,3 @@
 .idea
 *.un~
-./data/logs/*
-./data/postgresql/*
-./data/redit/*
+data

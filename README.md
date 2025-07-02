@@ -39,3 +39,8 @@ Steps:
      2. create the Socialroots databases: `./init-db.sh` *(you may need to 
         add execution permissions to the bash script first: `chmod +x 
         init-sb.sh`)*
+  4. Start the services: `docker-compose --env-file .env NAME_OF_SERVICE 
+  [--build]` **The [--build] is only needed if you want to rebuild the 
+     image.** The services available are:
+     1. orchestrator
+     2. ...
