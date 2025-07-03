@@ -3,6 +3,7 @@
 This repository is intended as an easy way to bootstrap a full Socialroots 
 server. It uses Docker and Compose to start all the needed components:
 
+  - NginX as an HTTP proxy
   - Postgres database
   - Redis cache database
   - SR Orchestrator
@@ -25,13 +26,15 @@ server. It uses Docker and Compose to start all the needed components:
 
 ## How to get it running?
 
-Requirements:
+### Requirements
+
   - You need to have **Docker** and **docker-compose** installed and 
     accessible by the user that is running the commands below;
   - You need to have **git** and the Postgresql client **psql** available 
     on your path;
 
-Steps:
+### Steps
+
   1. Cloning this repository and get inside its directory using a terminal;
   2. Then, load all the submodules by executing `git submodule update`;
   3. Bootstrap a brand-new database:
@@ -43,4 +46,5 @@ Steps:
   [--build]` **The [--build] is only needed if you want to rebuild the 
      image.** The services available are:
      1. orchestrator
-     2. ...
+     2. users
+     3. ...
