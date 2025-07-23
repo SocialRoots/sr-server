@@ -54,12 +54,12 @@ services:
       REDIS_KEY_HASH: ${REDIS_KEY_HASH}
       DISABLE_CACHE: ${DISABLE_CACHE}
       PROFILING_ENABLED: ${PROFILING_ENABLED}
-      ROOTSHOOT_USERS_SERVICE: ${ROOTSHOOT_SERVER}:${ROOTSHOOT_USERS_SERVICE_PORT}
-      ROOTSHOOT_GROUPS_SERVICE: ${ROOTSHOOT_SERVER}:${ROOTSHOOT_GROUPS_SERVICE_PORT}
-      ROOTSHOOT_NOTES_SERVICE: ${ROOTSHOOT_SERVER}:${ROOTSHOOT_NOTES_SERVICE_PORT}
-      ROOTSHOOT_RESPONSES_SERVICE: ${ROOTSHOOT_SERVER}:${ROOTSHOOT_RESPONSES_SERVICE_PORT}
-      ROOTSHOOT_NOTIFICATIONS_SERVICE: ${ROOTSHOOT_SERVER}:${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}
-      ROOTSHOOT_CONNECTIONS_SERVICE: ${ROOTSHOOT_SERVER}:${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}
+      ROOTSHOOT_USERS_SERVICE: "http://sr-rs-users:${ROOTSHOOT_USERS_SERVICE_PORT}"
+      ROOTSHOOT_GROUPS_SERVICE: "http://sr-rs-groups:${ROOTSHOOT_GROUPS_SERVICE_PORT}"
+      ROOTSHOOT_NOTES_SERVICE: "http://sr-rs-notes:${ROOTSHOOT_NOTES_SERVICE_PORT}"
+      ROOTSHOOT_RESPONSES_SERVICE: "http://sr-rs-responses:${ROOTSHOOT_RESPONSES_SERVICE_PORT}"
+      ROOTSHOOT_NOTIFICATIONS_SERVICE: "http://sr-rs-notifications:${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}"
+      ROOTSHOOT_CONNECTIONS_SERVICE: "http://sr-rs-connections:${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}"
       INTEGRATION_WEB_APP_HOST: ""
       STAGING_WEB_APP_HOST: ""
       CONVOX_INTEGRATION_DOMAIN: ""
@@ -88,6 +88,91 @@ services:
       AWS_REGION: ""
       AWS_IMAGE_BUCKET_NAME: ""
       SLACK_INCOMING_WEB_HOOK: ""
+    command: /go/bin/web
+    depends_on:
+      - orchestrator
+    networks:
+      - sr-network
+
+  rs-notes:
+    container_name: sr-rs-notes
+    build: modules/RS-NOTES/
+    ports:
+      - "${ROOTSHOOT_NOTES_SERVICE_PORT}:${ROOTSHOOT_NOTES_SERVICE_PORT}"
+    environment:
+      <<: *service_env
+      API_PORT: "$ROOTSHOOT_NOTES_SERVICE_PORT"
+      POSTGRES_DB_NAME: "$DB_NAME_NOTES"
+      NGROK: off
+      NGROK_RESPONSE_HOST: "https://4b4143ee8f0f.ngrok.io"
+      TEMPLATE_SAMPLE_NOTE_ID: 1
+      REPLYTO: "@reply.integration.socialroots.io"
+      REPLYTOSTAGE: "@reply.staging.socialroots.io"
+      MAILGUN_ADDRESS: "smtp.mailgun.org:587"
+      MAILGUN_USERNAME: ""
+      MAILGUN_PASSWORD: ""
+      MAILGUN_HOST: "smtp.mailgun.org"
+    command: /go/bin/web
+    depends_on:
+      - orchestrator
+    networks:
+      - sr-network
+
+  rs-groups:
+    container_name: sr-rs-groups
+    build: modules/RS-GROUPS/
+    ports:
+      - "${ROOTSHOOT_GROUPS_SERVICE_PORT}:${ROOTSHOOT_GROUPS_SERVICE_PORT}"
+    environment:
+      <<: *service_env
+      API_PORT: "$ROOTSHOOT_GROUPS_SERVICE_PORT"
+      POSTGRES_DB_NAME: "$DB_NAME_GROUPS"
+    command: /go/bin/web
+    depends_on:
+      - orchestrator
+    networks:
+      - sr-network
+
+  rs-connections:
+    container_name: sr-rs-connections
+    build: modules/RS-CONNECTIONS/
+    ports:
+      - "${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}:${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}"
+    environment:
+      <<: *service_env
+      API_PORT: "$ROOTSHOOT_CONNECTIONS_SERVICE_PORT"
+      POSTGRES_DB_NAME: "$DB_NAME_CONNECTIONS"
+    command: /go/bin/web
+    depends_on:
+      - orchestrator
+    networks:
+      - sr-network
+
+  rs-notifications:
+    container_name: sr-rs-notifications
+    build: modules/RS-NOTIFICATIONS/
+    ports:
+      - "${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}:${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}"
+    environment:
+      <<: *service_env
+      API_PORT: "$ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT"
+      POSTGRES_DB_NAME: "$DB_NAME_NOTIFICATIONS"
+      LOCAL_OVERRIDES: ""
+    command: /go/bin/web
+    depends_on:
+      - orchestrator
+    networks:
+      - sr-network
+
+  rs-responses:
+    container_name: sr-rs-responses
+    build: modules/RS-RESPONSES/
+    ports:
+      - "${ROOTSHOOT_RESPONSES_SERVICE_PORT}:${ROOTSHOOT_RESPONSES_SERVICE_PORT}"
+    environment:
+      <<: *service_env
+      API_PORT: "$ROOTSHOOT_RESPONSES_SERVICE_PORT"
+      POSTGRES_DB_NAME: "$DB_NAME_RESPONSES"
     command: /go/bin/web
     depends_on:
       - orchestrator

@@ -42,9 +42,14 @@ server. It uses Docker and Compose to start all the needed components:
      2. create the Socialroots databases: `./init-db.sh` *(you may need to 
         add execution permissions to the bash script first: `chmod +x 
         init-sb.sh`)*
-  4. Start the services: `docker-compose --env-file .env NAME_OF_SERVICE 
-  [--build]` **The [--build] is only needed if you want to rebuild the 
-     image.** The services available are:
-     1. orchestrator
-     2. users
-     3. ...
+  4. Start the services: `docker-compose --env-file .env NAME_OF_SERVICE [--build] [-d]` 
+     1. ... where `--build` is only needed if you want to rebuild the image in case you 
+        made changes to the code and `-d` if you want the container to execute in detached mode.*
+     2. **The services available are:**
+        1. orchestrator
+        2. rs-users
+        3. rs-groups
+        4. rs-connections
+        5. rs-notes
+        6. rs-notifications
+        7. rs-responses

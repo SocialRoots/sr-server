@@ -18,3 +18,11 @@
 	path = modules/RS-NOTIFICATIONS
 	url = git@github.com:SocialRoots/rootshoot-notification.git
 	branch = integration
+[submodule "modules/RS-NOTES"]
+	path = modules/RS-NOTES
+	url = git@github.com:SocialRoots/rootshoot-sendmail.git
+	branch = integration
+[submodule "modules/RS-RESPONSES"]
+	path = modules/RS-RESPONSES
+	url = git@github.com:SocialRoots/rootshoot-responsecapture.git
+	branch = integration
