@@ -8,7 +8,7 @@ SR_MIGRATION_PATH="./modules/SR_MODULE_FOLDER/scripts/migrate.sh"
 
 #TODO: How to not depend on this hardcoded module naming?
 SR_MODULE_DIR_PREFIX="RS-"
-SR_MODULES=$(ls -N ./modules/ | grep $SR_MODULE_DIR_PREFIX)
+SR_MODULES=$(ls ./modules/ | grep $SR_MODULE_DIR_PREFIX)
 
 export PGPASSWORD="$POSTGRES_PASSWORD"
 for service in "${SR_SERVICES[@]}"
