@@ -26,3 +26,7 @@
 	path = modules/RS-RESPONSES
 	url = git@github.com:SocialRoots/rootshoot-responsecapture.git
 	branch = integration
+[submodule "modules/RS-UTILS"]
+	path = modules/RS-UTILS
+	url = git@github.com:SocialRoots/sr-microservices-utils.git
+	branch = main

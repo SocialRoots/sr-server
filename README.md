@@ -11,6 +11,7 @@ server. It uses Docker and Compose to start all the needed components:
   - SR Groups microservice
   - SR Notifications microservice
   - SR Connections microservice
+  - SR Utils (a shared library with commonly used stuff)
   - [ToDo] A mock email server??
 
 (*) Obs: All SR services are added as Git Submodules.
@@ -38,14 +39,15 @@ server. It uses Docker and Compose to start all the needed components:
   1. Cloning this repository and get inside its directory using a terminal;
   2. Then, load all the submodules by executing `git submodule update`;
   3. Bootstrap a brand-new database:
-     1. start the Postgres server: `docker-compose --env-file .env up postgres`
+     1. start the Postgres server: `docker-compose --env-file .env up postgres -d`
      2. create the Socialroots databases: `./init-db.sh` *(you may need to 
-        add execution permissions to the bash script first: `chmod +x 
-        init-sb.sh`)*
-  4. Start the services: `docker-compose --env-file .env NAME_OF_SERVICE [--build] [-d]` 
+        add execution permissions to the bash script first: `chmod +x init-sb.sh`)*
+  4. Start the services: `docker-compose --env-file .env up NAME_OF_SERVICE 
+  [--build] [-d]` 
      1. ... where `--build` is only needed if you want to rebuild the image in case you 
         made changes to the code and `-d` if you want the container to execute in detached mode.*
-     2. **The services available are:**
+     2. ... you can add all the services in a single command call
+     3. **The services available are:**
         1. orchestrator
         2. rs-users
         3. rs-groups
