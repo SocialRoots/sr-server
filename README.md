@@ -6,6 +6,7 @@ server. It uses Docker and Compose to start all the needed components:
   - NginX as an HTTP proxy
   - Postgres database
   - Redis cache database
+  - Minio S3 storage provider
   - SR Orchestrator
   - SR Users microservice
   - SR Groups microservice
@@ -48,10 +49,39 @@ server. It uses Docker and Compose to start all the needed components:
         made changes to the code and `-d` if you want the container to execute in detached mode.*
      2. ... you can add all the services in a single command call
      3. **The services available are:**
-        1. orchestrator
+        1. redis
+        2. minio-init
+        2. orchestrator
         2. rs-users
         3. rs-groups
         4. rs-connections
         5. rs-notes
         6. rs-notifications
         7. rs-responses
+  5. Configure name resolving of your computer to see the services by name.
+     (There are many ways to do that, and this is the easiest one for Linux/MaxOS)
+
+     Edit the `/etc/hosts` file to ADD the lines to point to `127.0.0.1`:
+```
+     127.0.0.1 sr-postgres
+     127.0.0.1 sr-redis
+     127.0.0.1 sr-s3-minio
+     127.0.0.1 sr-orchestrator
+     127.0.0.1 sr-rs-users
+     127.0.0.1 sr-rs-groups
+     127.0.0.1 sr-rs-connections
+     127.0.0.1 sr-rs-notes
+     127.0.0.1 sr-rs-notifications
+     127.0.0.1 sr-rs-responses
+```
+
+### Observations
+
+The configuration of all these services are made through the `.env` file and 
+the default configuration is focused on a development environment, so, you
+will need to adjust it accordingly.
+
+- **S3-minio:** You want to be thoughtful about the host URL you configure
+  as the uploaded files will be saved to the database pointing to that URL.
+  The best case scenario here is that you will have a permanent, public 
+  facing name (like https://images.socialroots.io).
