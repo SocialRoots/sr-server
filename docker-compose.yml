@@ -206,6 +206,19 @@ services:
     networks:
       - sr-network
 
+  rs-notifications-cron:
+    container_name: sr-rs-notifications-cron
+    build: modules/RS-NOTIFICATIONS/
+    environment:
+      <<: *service_env
+      POSTGRES_DB_NAME: "$DB_NAME_NOTIFICATIONS"
+      LOCAL_OVERRIDES: ""
+    command: /go/bin/cron
+    depends_on:
+      - orchestrator
+    networks:
+      - sr-network
+
   rs-responses:
     container_name: sr-rs-responses
     build: modules/RS-RESPONSES/
