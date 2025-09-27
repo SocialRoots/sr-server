@@ -119,15 +119,15 @@ services:
       - "${ROOTSHOOT_USERS_SERVICE_PORT}:${ROOTSHOOT_USERS_SERVICE_PORT}"
     environment: &service_env
       <<: *orchestrator_env
-      API_PORT: "$ROOTSHOOT_USERS_SERVICE_PORT"
-      POSTGRES_DB_NAME: "$DB_NAME_USERS"
-      PASSWORD_COST: "$PASSWORD_COST"
-      SIGNING_KEY: "$SIGNING_KEY"
-      AWS_ACCESS_KEY_ID: "$S3_ACCESS_KEY_ID"
-      AWS_SECRET_ACCESS_KEY: "$S3_SECRET_ACCESS_KEY"
-      AWS_REGION: "$AWS_REGION"
-      AWS_IMAGE_BUCKET_NAME: "$MINIO_DEFAULT_BUCKET"
-      AWS_S3_ENDPOINT: "$S3_HOST"
+      API_PORT: ${ROOTSHOOT_USERS_SERVICE_PORT}
+      POSTGRES_DB_NAME: ${DB_NAME_USERS}
+      PASSWORD_COST: ${PASSWORD_COST}
+      SIGNING_KEY: ${SIGNING_KEY}
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      AWS_IMAGE_BUCKET_NAME: ${MINIO_DEFAULT_BUCKET}
+      AWS_S3_ENDPOINT: ${S3_HOST}
       SLACK_INCOMING_WEB_HOOK: ""
     command: /go/bin/web
     depends_on:
@@ -143,10 +143,10 @@ services:
       - "${ROOTSHOOT_NOTES_SERVICE_PORT}:${ROOTSHOOT_NOTES_SERVICE_PORT}"
     environment:
       <<: *service_env
-      API_PORT: "$ROOTSHOOT_NOTES_SERVICE_PORT"
-      POSTGRES_DB_NAME: "$DB_NAME_NOTES"
+      API_PORT: ${ROOTSHOOT_NOTES_SERVICE_PORT}
+      POSTGRES_DB_NAME: ${DB_NAME_NOTES}
       NGROK: off
-      NGROK_RESPONSE_HOST: "https://4b4143ee8f0f.ngrok.io"
+      NGROK_RESPONSE_HOST: ""
       TEMPLATE_SAMPLE_NOTE_ID: 1
       REPLYTO: "@reply.integration.socialroots.io"
       REPLYTOSTAGE: "@reply.staging.socialroots.io"
@@ -167,8 +167,8 @@ services:
       - "${ROOTSHOOT_GROUPS_SERVICE_PORT}:${ROOTSHOOT_GROUPS_SERVICE_PORT}"
     environment:
       <<: *service_env
-      API_PORT: "$ROOTSHOOT_GROUPS_SERVICE_PORT"
-      POSTGRES_DB_NAME: "$DB_NAME_GROUPS"
+      API_PORT: ${ROOTSHOOT_GROUPS_SERVICE_PORT}
+      POSTGRES_DB_NAME: ${DB_NAME_GROUPS}
     command: /go/bin/web
     depends_on:
       - orchestrator
@@ -182,8 +182,8 @@ services:
       - "${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}:${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}"
     environment:
       <<: *service_env
-      API_PORT: "$ROOTSHOOT_CONNECTIONS_SERVICE_PORT"
-      POSTGRES_DB_NAME: "$DB_NAME_CONNECTIONS"
+      API_PORT: ${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}
+      POSTGRES_DB_NAME: ${DB_NAME_CONNECTIONS}
     command: /go/bin/web
     depends_on:
       - orchestrator
@@ -197,8 +197,8 @@ services:
       - "${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}:${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}"
     environment:
       <<: *service_env
-      API_PORT: "$ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT"
-      POSTGRES_DB_NAME: "$DB_NAME_NOTIFICATIONS"
+      API_PORT: ${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}
+      POSTGRES_DB_NAME: ${DB_NAME_NOTIFICATIONS}
       LOCAL_OVERRIDES: ""
     command: /go/bin/web
     depends_on:
@@ -211,13 +211,14 @@ services:
     build: modules/RS-NOTIFICATIONS/
     environment:
       <<: *service_env
-      POSTGRES_DB_NAME: "$DB_NAME_NOTIFICATIONS"
+      POSTGRES_DB_NAME: ${DB_NAME_NOTIFICATIONS}
       LOCAL_OVERRIDES: ""
-    command: /go/bin/cron
+    command: sh -c "while true; do /go/bin/cron; sleep 300; done"
     depends_on:
       - orchestrator
     networks:
       - sr-network
+    restart: unless-stopped
 
   rs-responses:
     container_name: sr-rs-responses
@@ -226,8 +227,8 @@ services:
       - "${ROOTSHOOT_RESPONSES_SERVICE_PORT}:${ROOTSHOOT_RESPONSES_SERVICE_PORT}"
     environment:
       <<: *service_env
-      API_PORT: "$ROOTSHOOT_RESPONSES_SERVICE_PORT"
-      POSTGRES_DB_NAME: "$DB_NAME_RESPONSES"
+      API_PORT: ${ROOTSHOOT_RESPONSES_SERVICE_PORT}
+      POSTGRES_DB_NAME: ${DB_NAME_RESPONSES}
     command: /go/bin/web
     depends_on:
       - orchestrator
