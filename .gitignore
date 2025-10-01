@@ -1,5 +1,6 @@
 .idea
 *.un~
+.env
 data/*
 !data/.gitkeep
 !data/postgresql/.gitkeep

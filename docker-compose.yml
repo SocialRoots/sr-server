@@ -129,6 +129,12 @@ services:
       AWS_IMAGE_BUCKET_NAME: ${MINIO_DEFAULT_BUCKET}
       AWS_S3_ENDPOINT: ${S3_HOST}
       SLACK_INCOMING_WEB_HOOK: ""
+      REPLYTO: "${REPLYTO}"
+      REPLYTOSTAGE: "${REPLYTOSTAGE}"
+      MAILGUN_ADDRESS: "${MAILGUN_ADDRESS}"
+      MAILGUN_USERNAME: "${MAILGUN_USERNAME}"
+      MAILGUN_PASSWORD: "${MAILGUN_PASSWORD}"
+      MAILGUN_HOST: "${MAILGUN_HOST}"
     command: /go/bin/web
     depends_on:
       - orchestrator
@@ -148,12 +154,6 @@ services:
       NGROK: off
       NGROK_RESPONSE_HOST: ""
       TEMPLATE_SAMPLE_NOTE_ID: 1
-      REPLYTO: "@reply.integration.socialroots.io"
-      REPLYTOSTAGE: "@reply.staging.socialroots.io"
-      MAILGUN_ADDRESS: "smtp.mailgun.org:587"
-      MAILGUN_USERNAME: ""
-      MAILGUN_PASSWORD: ""
-      MAILGUN_HOST: "smtp.mailgun.org"
     command: /go/bin/web
     depends_on:
       - orchestrator
