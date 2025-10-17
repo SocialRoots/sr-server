@@ -38,7 +38,7 @@ server. It uses Docker and Compose to start all the needed components:
 ### Steps
 
   1. Cloning this repository and get inside its directory using a terminal;
-  2. Then, load all the submodules by executing `git submodule update`;
+  2. Then, load all the submodules by executing `git pull --recurse-submodules`;
   3. Bootstrap a brand-new database:
      1. start the Postgres server: `docker-compose --env-file .env up postgres -d`
      2. create the Socialroots databases: `./init-db.sh` *(you may need to 
