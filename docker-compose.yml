@@ -21,6 +21,15 @@ services:
       STAGE_POSTGRES_PORT: ""
     ports:
       - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+    shm_size: "2gb"
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "temp_buffers=16MB"
+      - "-c"
+      - "work_mem=16MB"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
