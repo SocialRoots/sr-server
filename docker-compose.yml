@@ -163,6 +163,7 @@ services:
       NGROK: off
       NGROK_RESPONSE_HOST: ""
       TEMPLATE_SAMPLE_NOTE_ID: 1
+      EMAIL_WHITELIST: "${EMAIL_WHITELIST}"
     command: /go/bin/web
     depends_on:
       - orchestrator
