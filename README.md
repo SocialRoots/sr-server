@@ -12,6 +12,7 @@ server. It uses Docker and Compose to start all the needed components:
   - SR Groups microservice
   - SR Notifications microservice
   - SR Connections microservice
+  - SR Membrane (DID and UCAN authorization service)
   - SR Utils (a shared library with commonly used stuff)
   - [ToDo] A mock email server??
 
@@ -58,6 +59,7 @@ server. It uses Docker and Compose to start all the needed components:
         5. rs-notes
         6. rs-notifications
         7. rs-responses
+        8. rs-membrane
   5. Configure name resolving of your computer to see the services by name.
      (There are many ways to do that, and this is the easiest one for Linux/MaxOS)
 

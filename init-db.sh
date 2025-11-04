@@ -2,7 +2,7 @@
 source ./.env
 #printenv | grep POSTGRES
 
-SR_SERVICES=("ORCHESTRATOR" "USERS" "GROUPS" "NOTES" "RESPONSES" "NOTIFICATIONS" "CONNECTIONS")
+SR_SERVICES=("ORCHESTRATOR" "USERS" "GROUPS" "NOTES" "RESPONSES" "NOTIFICATIONS" "CONNECTIONS" "MEMBRANE")
 #GET installed submodules modules to execute migrations
 SR_MIGRATION_PATH="./modules/SR_MODULE_FOLDER/scripts/migrate.sh"
 

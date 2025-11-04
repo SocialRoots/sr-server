@@ -240,6 +240,23 @@ services:
       - sr-network
     restart: unless-stopped
 
+  rs-membrane:
+    container_name: sr-rs-membrane
+    build: modules/RS-MEMBRANE/
+    ports:
+      - "${ROOTSHOOT_MEMBRANE_SERVICE_PORT}:${ROOTSHOOT_MEMBRANE_SERVICE_PORT}"
+    environment:
+      <<: *service_env
+      API_PORT: ${ROOTSHOOT_MEMBRANE_SERVICE_PORT}
+      POSTGRES_DB_NAME: ${DB_NAME_MEMBRANE}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+    command: /go/bin/web
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - sr-network
+
   rs-responses:
     container_name: sr-rs-responses
     build: modules/RS-RESPONSES/

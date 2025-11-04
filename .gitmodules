@@ -30,3 +30,7 @@
 	path = modules/RS-UTILS
 	url = git@github.com:SocialRoots/sr-microservices-utils.git
 	branch = main
+[submodule "modules/RS-MEMBRANE"]
+	path = modules/RS-MEMBRANE
+	url = git@github.com:SocialRoots/rootshoot-membrane.git
+	branch = main
