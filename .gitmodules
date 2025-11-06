@@ -34,3 +34,6 @@
 	path = modules/RS-MEMBRANE
 	url = git@github.com:SocialRoots/rootshoot-membrane.git
 	branch = main
+[submodule "modules/SR-NOSTR-GATEWAY"]
+	path = modules/SR-NOSTR-GATEWAY
+	url = git@github.com:SocialRoots/sr-nostr-gateway.git

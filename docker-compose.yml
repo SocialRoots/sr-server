@@ -79,6 +79,7 @@ services:
       ROOTSHOOT_RESPONSES_SERVICE: "http://sr-rs-responses:${ROOTSHOOT_RESPONSES_SERVICE_PORT}"
       ROOTSHOOT_NOTIFICATIONS_SERVICE: "http://sr-rs-notifications:${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}"
       ROOTSHOOT_CONNECTIONS_SERVICE: "http://sr-rs-connections:${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}"
+      ROOTSHOOT_MEMBRANE_SERVICE: "http://sr-rs-membrane:${ROOTSHOOT_MEMBRANE_SERVICE_PORT}"
       INTEGRATION_WEB_APP_HOST: ""
       STAGING_WEB_APP_HOST: ""
       CONVOX_INTEGRATION_DOMAIN: ""
@@ -174,9 +175,14 @@ services:
       NGROK_RESPONSE_HOST: ""
       TEMPLATE_SAMPLE_NOTE_ID: 1
       EMAIL_WHITELIST: "${EMAIL_WHITELIST}"
+      NOSTR_SYNC_ENABLED: ${NOSTR_SYNC_ENABLED}
+      GATEWAY_SERVICE_URL: "http://sr-nostr-gateway:${ROOTSHOOT_NOSTR_GATEWAY_PORT}"
+      SOCIALROOTS_BASE_URL: "http://localhost:${ROOTSHOOT_ORCHESTRATOR_PORT}"
     command: /go/bin/web
     depends_on:
       - orchestrator
+      - rs-membrane
+      - nostr-gateway
     networks:
       - sr-network
 
@@ -254,6 +260,26 @@ services:
     depends_on:
       - postgres
       - redis
+    networks:
+      - sr-network
+
+  nostr-gateway:
+    container_name: sr-nostr-gateway
+    build: modules/SR-NOSTR-GATEWAY/
+    ports:
+      - "${ROOTSHOOT_NOSTR_GATEWAY_PORT}:${ROOTSHOOT_NOSTR_GATEWAY_PORT}"
+    environment:
+      <<: *service_env
+      API_PORT: ${ROOTSHOOT_NOSTR_GATEWAY_PORT}
+      POSTGRES_DB_NAME: ${DB_NAME_NOSTR_GATEWAY}
+      NOSTR_DEFAULT_RELAYS: ${NOSTR_DEFAULT_RELAYS}
+      GATEWAY_NSEC: ${GATEWAY_NSEC}
+    command: /go/bin/web
+    depends_on:
+      - postgres
+      - redis
+      - rs-users
+      - rs-membrane
     networks:
       - sr-network
 
