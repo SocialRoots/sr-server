@@ -195,6 +195,7 @@ services:
       <<: *service_env
       API_PORT: ${ROOTSHOOT_GROUPS_SERVICE_PORT}
       POSTGRES_DB_NAME: ${DB_NAME_GROUPS}
+      DEFAULT_POLICY_TEMPLATE: ${DEFAULT_POLICY_TEMPLATE}
     command: /go/bin/web
     depends_on:
       - orchestrator
