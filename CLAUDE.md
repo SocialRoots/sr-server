@@ -116,6 +116,17 @@ go run cmd/script/main.go  # Run utility scripts
 - Test databases configured via `.env.test` files
 - Integration tests communicate with other services via HTTP clients
 
+### Testing Best Practices
+- **IMPORTANT**: Tests use a dedicated test DATABASE (`rootshoot-tests`), NOT `_test` suffixed tables
+- Do NOT use `TestCk()` or similar table suffix functions in tests - use the main table names
+- The `.env.test` file points to the test database, so migrations create tables with normal names there
+- **IMPORTANT**: The test database is shared across modules. Before running migrations for a module, you must reset the database:
+  ```bash
+  PGPASSWORD='th15.R00TZ' psql -U socialroots -h localhost -d rootshoot-tests -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO socialroots;"
+  ```
+- Then run migrations: `set -a && source .env.test && set +a && ./scripts/migrate.sh migrate`
+- To run tests: `set -a && source .env.test && set +a && go test -v ./pkg/db`
+
 ### Security & Authentication
 - ORCHESTRATOR handles authentication and authorization
 - Services validate requests through user tokens and service keys

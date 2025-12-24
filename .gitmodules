@@ -1,31 +1,31 @@
 [submodule "modules/ORCHESTRATOR"]
 	path = modules/ORCHESTRATOR
 	url = git@github.com:SocialRoots/rootshoots-orchestrate.git
-	branch = integration
+	branch = alpha
 [submodule "modules/RS-USERS"]
 	path = modules/RS-USERS
 	url = git@github.com:SocialRoots/rootshoot-users.git
-	branch = integration
+	branch = alpha
 [submodule "modules/RS-GROUPS"]
 	path = modules/RS-GROUPS
 	url = git@github.com:SocialRoots/rootshoot-groups.git
-	branch = integration
+	branch = alpha
 [submodule "modules/RS-CONNECTIONS"]
 	path = modules/RS-CONNECTIONS
 	url = git@github.com:SocialRoots/rootshoots-connections.git
-	branch = integration
+	branch = alpha
 [submodule "modules/RS-NOTIFICATIONS"]
 	path = modules/RS-NOTIFICATIONS
 	url = git@github.com:SocialRoots/rootshoot-notification.git
-	branch = integration
+	branch = alpha
 [submodule "modules/RS-NOTES"]
 	path = modules/RS-NOTES
 	url = git@github.com:SocialRoots/rootshoot-sendmail.git
-	branch = integration
+	branch = alpha
 [submodule "modules/RS-RESPONSES"]
 	path = modules/RS-RESPONSES
 	url = git@github.com:SocialRoots/rootshoot-responsecapture.git
-	branch = integration
+	branch = alpha
 [submodule "modules/RS-UTILS"]
 	path = modules/RS-UTILS
 	url = git@github.com:SocialRoots/sr-microservices-utils.git
