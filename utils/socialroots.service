@@ -1,0 +1,14 @@
+[Unit]
+Description=SocialRoots Services
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/media/DATA/WORKSPACE/SOCIAL_ROOTS/sr-server
+ExecStart=/usr/bin/docker compose --env-file .env up -d
+ExecStop=/usr/bin/docker compose --env-file .env down
+
+[Install]
+WantedBy=multi-user.target

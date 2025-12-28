@@ -170,7 +170,7 @@ def sync_to_remote(remote_name: str, backup_dir: str):
         sys.exit(f"Error: Remote '{remote_name}' not found. Available: {', '.join(remotes)}")
 
     # Sync backup directory
-    remote_path = f"{remote_name}:."
+    remote_path = f"{remote_name}:"
     print(f"Syncing {backup_dir} to {remote_path}...", end=' ', flush=True)
 
     result = subprocess.run(
