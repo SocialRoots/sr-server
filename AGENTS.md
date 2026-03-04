@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding assistants when working with code in this repository.
 
 ## Architecture Overview
 
@@ -28,8 +28,8 @@ Each microservice is a separate Go module with its own database, migrations, and
 git submodule update --init --recursive
 
 # Set up databases (requires PostgreSQL running)
-chmod +x init-db.sh
-./init-db.sh
+chmod +x bin/init-db.sh
+./bin/init-db.sh
 ```
 
 ### Docker Operations
@@ -115,6 +115,17 @@ go run cmd/script/main.go  # Run utility scripts
 - Tests run with race condition detection enabled
 - Test databases configured via `.env.test` files
 - Integration tests communicate with other services via HTTP clients
+
+### Testing Best Practices
+- **IMPORTANT**: Tests use a dedicated test DATABASE (`rootshoot-tests`), NOT `_test` suffixed tables
+- Do NOT use `TestCk()` or similar table suffix functions in tests - use the main table names
+- The `.env.test` file points to the test database, so migrations create tables with normal names there
+- **IMPORTANT**: The test database is shared across modules. Before running migrations for a module, you must reset the database:
+  ```bash
+  PGPASSWORD='th15.R00TZ' psql -U socialroots -h localhost -d rootshoot-tests -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO socialroots;"
+  ```
+- Then run migrations: `set -a && source .env.test && set +a && ./scripts/migrate.sh migrate`
+- To run tests: `set -a && source .env.test && set +a && go test -v ./pkg/db`
 
 ### Security & Authentication
 - ORCHESTRATOR handles authentication and authorization
