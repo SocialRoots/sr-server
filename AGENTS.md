@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding assistants when working with code in this repository.
 
 ## Architecture Overview
 
@@ -28,8 +28,8 @@ Each microservice is a separate Go module with its own database, migrations, and
 git submodule update --init --recursive
 
 # Set up databases (requires PostgreSQL running)
-chmod +x init-db.sh
-./init-db.sh
+chmod +x bin/init-db.sh
+./bin/init-db.sh
 ```
 
 ### Docker Operations

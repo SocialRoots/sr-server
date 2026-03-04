@@ -17,6 +17,8 @@ server. It uses Docker and Compose to start all the needed components:
 
 (*) Obs: All SR services are added as Git Submodules.
 
+**Note:** Some modules referenced as submodules are not yet publicly available. We are open-sourcing the project incrementally.
+
 ## Directory structure
 
   - `.`: The most relevant files in the home directory are the 
@@ -41,8 +43,8 @@ server. It uses Docker and Compose to start all the needed components:
   2. Then, load all the submodules by executing `git submodule update --init`;
   3. Bootstrap a brand-new database:
      1. start the Postgres server: `docker-compose --env-file .env up postgres -d`
-     2. create the Socialroots databases: `./init-db.sh` *(you may need to 
-        add execution permissions to the bash script first: `chmod +x init-sb.sh`)*
+     2. create the Socialroots databases: `./bin/init-db.sh` *(you may need to
+        add execution permissions to the bash script first: `chmod +x bin/init-db.sh`)*
   4. Start the services: `docker-compose --env-file .env up NAME_OF_SERVICE 
   [--build] [-d]` 
      1. ... where `--build` is only needed if you want to rebuild the image in case you 

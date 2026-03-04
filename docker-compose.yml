@@ -255,6 +255,18 @@ services:
     networks:
       - sr-network
 
+  sr-next:
+    container_name: sr-next
+    restart: unless-stopped
+    image: sr-next:${VERSION}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - orchestrator
+    networks:
+      - sr-network
+
+
 volumes:
   postgres_data:
     driver: local
