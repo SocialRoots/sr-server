@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-source ./.env
+#source ./.env
 #printenv | grep POSTGRES
 
 SR_SERVICES=("ORCHESTRATOR" "USERS" "GROUPS" "NOTES" "RESPONSES" "NOTIFICATIONS" "CONNECTIONS")
