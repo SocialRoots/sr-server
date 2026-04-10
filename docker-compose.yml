@@ -51,11 +51,12 @@ services:
     container_name: sr-orchestrator
     build: modules/ORCHESTRATOR/
     ports:
-      - "${ROOTSHOOT_ORCHESTRATOR_PORT}:${ROOTSHOOT_ORCHESTRATOR_PORT}"
+      - "${SR_ORCHESTRATOR_PORT}:${SR_ORCHESTRATOR_PORT}"
     environment: &orchestrator_env
       <<: *db_env
       ENV: ${ENV}
-      PORT: ${ROOTSHOOT_ORCHESTRATOR_PORT}
+      PORT: ${SR_ORCHESTRATOR_PORT}
+      SR_API_PREFIX: ${SR_API_PREFIX}
       LOCALENV: ${LOCALENV}
       POSTGRES_HOST: "sr-postgres"
       REDIS_HOST: "sr-redis"
@@ -120,8 +121,6 @@ services:
   rs-users:
     container_name: sr-rs-users
     build: modules/RS-USERS/
-    ports:
-      - "${ROOTSHOOT_USERS_SERVICE_PORT}:${ROOTSHOOT_USERS_SERVICE_PORT}"
     environment: &service_env
       <<: *orchestrator_env
       API_PORT: ${ROOTSHOOT_USERS_SERVICE_PORT}
@@ -149,8 +148,6 @@ services:
   rs-notes:
     container_name: sr-rs-notes
     build: modules/RS-NOTES/
-    ports:
-      - "${ROOTSHOOT_NOTES_SERVICE_PORT}:${ROOTSHOOT_NOTES_SERVICE_PORT}"
     environment:
       <<: *service_env
       API_PORT: ${ROOTSHOOT_NOTES_SERVICE_PORT}
@@ -168,8 +165,6 @@ services:
   rs-groups:
     container_name: sr-rs-groups
     build: modules/RS-GROUPS/
-    ports:
-      - "${ROOTSHOOT_GROUPS_SERVICE_PORT}:${ROOTSHOOT_GROUPS_SERVICE_PORT}"
     environment:
       <<: *service_env
       API_PORT: ${ROOTSHOOT_GROUPS_SERVICE_PORT}
@@ -183,8 +178,6 @@ services:
   rs-connections:
     container_name: sr-rs-connections
     build: modules/RS-CONNECTIONS/
-    ports:
-      - "${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}:${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}"
     environment:
       <<: *service_env
       API_PORT: ${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}
@@ -198,8 +191,6 @@ services:
   rs-notifications:
     container_name: sr-rs-notifications
     build: modules/RS-NOTIFICATIONS/
-    ports:
-      - "${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}:${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}"
     environment:
       <<: *service_env
       API_PORT: ${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}
@@ -228,8 +219,6 @@ services:
   rs-responses:
     container_name: sr-rs-responses
     build: modules/RS-RESPONSES/
-    ports:
-      - "${ROOTSHOOT_RESPONSES_SERVICE_PORT}:${ROOTSHOOT_RESPONSES_SERVICE_PORT}"
     environment:
       <<: *service_env
       API_PORT: ${ROOTSHOOT_RESPONSES_SERVICE_PORT}
