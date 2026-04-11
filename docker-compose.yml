@@ -57,6 +57,7 @@ services:
       ENV: ${ENV}
       PORT: ${SR_ORCHESTRATOR_PORT}
       SR_API_PREFIX: ${SR_API_PREFIX}
+      SR_SESSION_TTL_HOURS: ${SR_SESSION_TTL_HOURS}
       LOCALENV: ${LOCALENV}
       POSTGRES_HOST: "sr-postgres"
       REDIS_HOST: "sr-redis"
