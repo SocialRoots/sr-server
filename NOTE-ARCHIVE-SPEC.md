@@ -299,3 +299,20 @@ Resolved:
 - **(R5) Writable surface — RESOLVED.** No note-content edit endpoint exists. The only post-send writes are RS-RESPONSES replies, emotes, and reactions (enumerated in §6); those are the complete guard targets.
 
 - **(O1) Write-guard placement — DECIDED: RS-RESPONSES.** Enforce read-only server-side in the RS-RESPONSES write endpoints (§6), so it holds even for direct callers.
+
+---
+
+## 11. Follow-ups (TODO)
+
+- **Strip the orchestrator `archiveNote*` mutations.** The frontend writes go REST-direct to RS-NOTES via capability keys (GraphQL is read-only here), so `archiveNoteInInbox` / `archiveNoteForGroup` are dead. They also now point at the **removed** id-based RS-NOTES routes, so they would 404 if ever called (harmless — nothing calls them). Stripping them requires regenerating gqlgen, which is **blocked**: the main caching-refactor merge bumped `rootshoots-utils` to require go ≥ 1.24.1, but the vendored gqlgen 0.14.0's `x/tools` panics on go-1.24 export data. Fix = upgrade gqlgen (0.14 → 0.17+) and regenerate — its own focused task (regenerates all of `generated.go`, may change resolver signatures). Keep `Note.readOnly` (still used by reads).
+- **RS-NOTES DB-integration tests.** Convert the rolled-back-txn SQL validations (read-only derivation, cap-key resolution) into committed `_test.go` tests once a `TestMain` + isolated-test-DB harness is set up in RS-NOTES (see RS-USERS/pkg/db/main_test.go for the reference pattern).
+
+## 12. Final endpoint reference (RS-NOTES, :2000 — browser-direct, cap-key auth)
+
+```
+GET /note/link/:userCapKey/inbox/archive/:archived     # Op 1 personal: strict user_note key, self-authorizing
+GET /note/link/:groupCapKey/group/archive/:archived    # Op 2 leader: key proves participation; lead/creator checked via Groups
+GET /note/link/:link/writable                          # writability by cap key (used by RS-RESPONSES guard)
+GET /note/id/:id/writable/user/:userKey                # writability by id+user (used by RS-RESPONSES addEmote guard)
+```
+:archived = true|false. Errors (400/403/404) carry Access-Control-Allow-Origin. 200 body: { error, message, archived, changed, [group_key] }.
