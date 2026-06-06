@@ -275,8 +275,16 @@ Regenerate gqlgen artifacts (`graph/generated`, `graph/model/models_gen.go`) aft
    - RS-RESPONSES: `pkg/client/notesclient.go` adds `IsNoteWritableForUser` / `IsNoteLinkWritable` (GET + `ForceInvalidation` to bypass the response cache; fail-open via `noteWritable`). Guards added in `addReplyToNoteLink` (reply.go, by link) and `addEmote` (emote.go, by note+user) → `403` when read-only.
    - **Scope decision:** guarded the genuine user writes (reply, emote). NOT guarded: `catchReaction` (dominated by passive telemetry — read-detect/eyeball/visibility — which should still fire on a still-viewable archived note), `setupBulkNewNoteReactions` (system setup at send; never archived), and `logReplyResponse`/async email-reply ingestion (no note/user at entry — a follow-up if inbound email replies to archived notes must be blocked).
    - Verified: all three modules build clean; both writability queries `EXPLAIN`-valid against live `sr_notes`; link read-only truth table (f/f/t + unknown→writable) confirmed in a rolled-back txn; RS-NOTES route registration test passed (no gin conflict across all new routes).
-6. Remove/lock down legacy `GET /note/id/:id/status/:status` (after caller audit).
-7. Tests: per-user hide, group archive single-group, cross-group (B stays active), read-only enforcement on reply, leader-vs-non-leader authz, subgroup leader.
+6. ✅ Remove legacy `GET /note/id/:id/status/:status` — DONE.
+   - Removed the route (`server.go`), the `updateNoteStatus` handler (`note.go`), and the blacklist regex (`userauth/authentication.go`).
+   - Kept `db.PGXUpdateStatus` — still used by `pkg/services/notes_processing.go` to set notes "active".
+   - Verified: builds clean; grep confirms route/handler/blacklist gone.
+7. ✅ Tests — DONE.
+   - RS-NOTES `pkg/web/archive_routes_test.go`: asserts the 4 archive/writability routes register (no gin conflict) AND the legacy status route is removed.
+   - RS-RESPONSES `pkg/client/notewritable_test.go`: 8 cases covering `noteWritable` fail-open semantics (nil/empty/non-bool → writable; writable precedence over read_only).
+   - ORCHESTRATOR `pkg/clients/archiveresult_test.go`: `archiveResultFromResponse` field mapping, error surfacing, changed=false, nil fallback.
+   - All pass (run via Go 1.24 + each module's `.env.test`).
+   - Note: read-only DB derivation (per-user hide, single/cross-group, link variant) was validated functionally via rolled-back-txn SQL tests during steps 3 & 5; a Go DB-integration harness (TestMain + isolated test DB) is not yet set up in RS-NOTES — a candidate follow-up to convert those into committed `_test.go` DB tests.
 
 ---
 
