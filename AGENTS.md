@@ -147,3 +147,36 @@ Each service module is a git submodule. When making changes:
 2. Commit changes within the module (creates commit in submodule repo)
 3. Commit the submodule reference update in the main repo
 4. Use `git submodule update --remote` to pull latest changes from all submodules
+
+## Filing Design Issues
+
+Design discussions and proposals (e.g. new features, architectural changes) are captured as markdown files in `issues/` directories within each module, not GitHub Issues. This keeps design context co-located with the code.
+
+### Convention
+
+- **Location:** `modules/[MODULE_NAME]/issues/`
+- **Filename:** `<numbered-prefix>-<kebab-case-slug>.md`
+  - Prefix: zero-padded four digits (`0001`, `0002`, …). Next available number.
+  - Slug: descriptive, kebab-case (e.g. `email-change-feature`).
+- **Structure:** Sections with `##` headings. Common sections include:
+  - `Summary` — what the issue proposes in 2-3 sentences
+  - `Background` — context: schemas, code paths, constraints discovered during research
+  - `Proposed flow` — step-by-step, often with a sequence diagram
+  - `Data structures` — new or changed types, functions, DB columns
+  - `API surface` — new endpoints, GraphQL mutations
+  - `Security` — risks and mitigations
+  - `Implementation order` — phased breakdown
+  - `Test strategy` — unit, handler, integration tests
+  - `Open questions` — unresolved design decisions
+  - `Out of scope` — things explicitly not being addressed
+
+### When to file
+
+- After a design discussion where the path forward is clear but not yet implemented
+- When research reveals a cross-module impact that needs documentation
+- Before starting implementation of a non-trivial feature
+
+### Examples
+
+- `modules/ORCHESTRATOR/issues/0002-divergent-locatenotes-paths.md`
+- `modules/RS-USERS/issues/0001-email-change-feature.md`
