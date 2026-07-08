@@ -17,6 +17,8 @@ server. It uses Docker and Compose to start all the needed components:
 
 (*) Obs: All SR services are added as Git Submodules.
 
+**Note:** Some modules referenced as submodules are not yet publicly available. We are open-sourcing the project incrementally.
+
 ## Directory structure
 
   - `.`: The most relevant files in the home directory are the 
@@ -41,8 +43,8 @@ server. It uses Docker and Compose to start all the needed components:
   2. Then, load all the submodules by executing `git submodule update --init`;
   3. Bootstrap a brand-new database:
      1. start the Postgres server: `docker-compose --env-file .env up postgres -d`
-     2. create the Socialroots databases: `./init-db.sh` *(you may need to 
-        add execution permissions to the bash script first: `chmod +x init-sb.sh`)*
+     2. create the Socialroots databases: `./bin/init-db.sh` *(you may need to
+        add execution permissions to the bash script first: `chmod +x bin/init-db.sh`)*
   4. Start the services: `docker-compose --env-file .env up NAME_OF_SERVICE 
   [--build] [-d]` 
      1. ... where `--build` is only needed if you want to rebuild the image in case you 
@@ -85,3 +87,30 @@ will need to adjust it accordingly.
   as the uploaded files will be saved to the database pointing to that URL.
   The best case scenario here is that you will have a permanent, public 
   facing name (like https://images.socialroots.io).
+
+## Deprecating an HTTP endpoint
+
+When an endpoint has no remaining callers (verified by grepping `sr-server`,
+`sr-next`, `sr-client`, including dynamically-built URLs), retire it in
+small reversible steps so unknown callers (admin tools, ops scripts) surface
+loudly rather than break silently:
+
+1. **Block at the orchestrator proxy** — add a row to `denyList` in
+   `modules/ORCHESTRATOR/pkg/api/api.go` (returns `410 Gone` before
+   forwarding). Reverse with one comment if needed.
+2. **Mark the handler in the owning microservice** with a `// Deprecated:`
+   Godoc comment plus a `log.Printf("[DEPRECATED-HANDLER] ...")` line at
+   the top of the function body. The Godoc tag triggers `gopls`/
+   `staticcheck` warnings on any caller; the log line catches direct
+   internal-network hits the proxy can't see.
+3. **Annotate frontend wrappers** (e.g. in `sr-client`) with `@deprecated`
+   JSDoc so editors flag new uses.
+4. **Bake.** Grep `[DEPRECATED-HANDLER]` in service logs over a deprecation
+   window. If zero hits, replace the handler body with a `c.JSON(410, ...)`
+   response (defense-in-depth).
+5. **Bake again.** If still no breakage reports, remove the route
+   registration in `server.go`.
+6. **Delete the handler function.**
+
+The greppable tags (`Deprecated:`, `[DEPRECATED-HANDLER]`, `denyList`,
+`@deprecated`) make each cleanup sweep mechanical.

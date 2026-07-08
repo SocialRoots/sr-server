@@ -1,9 +1,7 @@
 .idea
 *.un~
 .env
-data/*
-!data/.gitkeep
-!data/postgresql/.gitkeep
-!data/redis/.gitkeep
-!data/logs/.gitkeep
-!data/minio/.gitkeep
+data/postgresql/*
+data/redis/*
+data/minio/*
+data/logs/*

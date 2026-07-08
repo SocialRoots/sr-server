@@ -1,0 +1,2 @@
+# Docker-owned volume — git doesn't touch it
+postgresql/
