@@ -49,6 +49,7 @@ services:
       ROOTSHOOT_NOTIFICATIONS_SERVICE: "http://sr-rs-notifications:${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}"
       ROOTSHOOT_CONNECTIONS_SERVICE: "http://sr-rs-connections:${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}"
       POSTHOG_API_KEY: ${POSTHOG_API_KEY}
+      SR_INTERNAL_TOKEN: ${SR_INTERNAL_TOKEN}
     command: /go/bin/api
     depends_on:
       - redis
