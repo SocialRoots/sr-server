@@ -21,9 +21,11 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.sr-orc.rule=Host(`alpha.socialroots.io`) && PathPrefix(`/api/`)"
+      - "traefik.http.routers.sr-orc.priority=80"
       - "traefik.http.routers.sr-orc.tls.certresolver=letsencrypt"
       - "traefik.http.services.sr-orc.loadbalancer.server.port=${SR_ORCHESTRATOR_PORT}"
       - "traefik.http.routers.sr-orc-query.rule=Host(`alpha.socialroots.io`) && Path(`/query`)"
+      - "traefik.http.routers.sr-orc-query.priority=70"
       - "traefik.http.routers.sr-orc-query.tls.certresolver=letsencrypt"
       - "traefik.http.routers.sr-orc-query.service=sr-orc"
     environment: &orchestrator_env
@@ -184,7 +186,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.sr-email.rule=Host(`alpha.socialroots.io`) && PathPrefix(`/api/email/`)"
       - "traefik.http.routers.sr-email.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.sr-email.priority=50"
+      - "traefik.http.routers.sr-email.priority=90"
       - "traefik.http.services.sr-email.loadbalancer.server.port=${SR_EMAIL_PORT}"
     environment:
       ENV: ${ENV}
