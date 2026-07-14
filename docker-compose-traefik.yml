@@ -1,67 +1,43 @@
-name: sr-server
-services:
-  postgres:
-    container_name: sr-postgres
-    image: postgres:17.5-alpine
-    environment: &db_env
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_HOST: ${POSTGRES_HOST}
-      POSTGRES_PORT: ${POSTGRES_PORT}
-    ports:
-      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
-    shm_size: "2gb"
-    command:
-      - "postgres"
-      - "-c"
-      - "shared_buffers=256MB"
-      - "-c"
-      - "temp_buffers=16MB"
-      - "-c"
-      - "work_mem=16MB"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - sr-network
+# Deployment compose for SocialRoots server.
+# Build images from /srv/SW/sr-server/ using the source repo's docker-compose.yml,
+# then deploy here with: docker compose up -d
 
+name: sr-server
+
+services:
   redis:
     container_name: sr-redis
     image: redis:8-alpine
-    ports:
-      - "6379:6379"
     volumes:
-      - redis_data:/data
+      - /srv/data/sr-server/redis:/data
     networks:
-      - sr-network
+      - sr-internal
     restart: unless-stopped
     command: redis-server
 
-  mailhog:
-    container_name: sr-mailhog
-    image: mailhog/mailhog:latest
-    ports:
-      - "1025:1025"  # SMTP server
-      - "8025:8025"  # Web UI
-    networks:
-      - sr-network
-    restart: unless-stopped
-
   orchestrator:
     container_name: sr-orchestrator
-    build: modules/ORCHESTRATOR/
-    ports:
-      - "${SR_ORCHESTRATOR_PORT}:${SR_ORCHESTRATOR_PORT}"
+    image: sr-server-orchestrator:latest
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sr-orc.rule=Host(`alpha.socialroots.io`) && PathPrefix(`/api/`)"
+      - "traefik.http.routers.sr-orc.tls.certresolver=letsencrypt"
+      - "traefik.http.services.sr-orc.loadbalancer.server.port=${SR_ORCHESTRATOR_PORT}"
+      - "traefik.http.routers.sr-orc-query.rule=Host(`alpha.socialroots.io`) && Path(`/query`)"
+      - "traefik.http.routers.sr-orc-query.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sr-orc-query.service=sr-orc"
     environment: &orchestrator_env
-      <<: *db_env
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: ${POSTGRES_PORT}
       ENV: ${ENV}
       PORT: ${SR_ORCHESTRATOR_PORT}
-      SR_API_PREFIX: ${SR_API_PREFIX}
-      SR_SESSION_TTL_HOURS: ${SR_SESSION_TTL_HOURS}
       LOCALENV: ${LOCALENV}
-      POSTGRES_HOST: "sr-postgres"
       REDIS_HOST: "sr-redis"
       REDIS_EXPIRATION: ${REDIS_EXPIRATION}
+      REDIS_KEY_HASH: ${REDIS_KEY_HASH}
       DISABLE_CACHE: ${DISABLE_CACHE}
       PROFILING_ENABLED: ${PROFILING_ENABLED}
       ROOTSHOOT_USERS_SERVICE: "http://sr-rs-users:${ROOTSHOOT_USERS_SERVICE_PORT}"
@@ -70,70 +46,29 @@ services:
       ROOTSHOOT_RESPONSES_SERVICE: "http://sr-rs-responses:${ROOTSHOOT_RESPONSES_SERVICE_PORT}"
       ROOTSHOOT_NOTIFICATIONS_SERVICE: "http://sr-rs-notifications:${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}"
       ROOTSHOOT_CONNECTIONS_SERVICE: "http://sr-rs-connections:${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}"
-      WEB_APP_HOST: ${WEB_APP_HOST}
       POSTHOG_API_KEY: ${POSTHOG_API_KEY}
-      SR_INTERNAL_TOKEN: ${SR_INTERNAL_TOKEN}
     command: /go/bin/api
     depends_on:
-      - postgres
       - redis
     networks:
-      - sr-network
-
-  s3-minio:
-    container_name: sr-s3-minio
-    image: minio/minio:latest
-    ports:
-      - "${MINIO_API_PORT}:9000"
-      - "${MINIO_CONSOLE_PORT}:9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio_data:/data
-    networks:
-      - sr-network
-    restart: unless-stopped
-
-  minio-init:
-    image: minio/mc:latest
-    container_name: sr-minio-init
-    depends_on:
-      - s3-minio
-    environment:
-      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
-      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
-      S3_HOST: ${S3_HOST}
-    entrypoint: >
-      /bin/sh -c "
-      sleep 10;
-      /usr/bin/mc alias set srminio ${S3_HOST} ${MINIO_ROOT_USER} 
-      ${MINIO_ROOT_PASSWORD};
-      /usr/bin/mc mb srminio/${MINIO_DEFAULT_BUCKET} --ignore-existing;
-      /usr/bin/mc anonymous set public srminio/${MINIO_DEFAULT_BUCKET};
-      /usr/bin/mc admin user add srminio ${S3_ACCESS_KEY_ID} ${S3_SECRET_ACCESS_KEY};
-      /usr/bin/mc admin policy attach srminio readwrite --user ${S3_ACCESS_KEY_ID};
-      echo 'Bucket and access keys configured successfully';
-      exit 0;
-      "
-    networks:
-      - sr-network
+      - sr-internal
+      - db
+      - web
 
   rs-users:
     container_name: sr-rs-users
-    build: modules/RS-USERS/
+    image: sr-server-rs-users:latest
     environment: &service_env
       <<: *orchestrator_env
       API_PORT: ${ROOTSHOOT_USERS_SERVICE_PORT}
       POSTGRES_DB_NAME: ${DB_NAME_USERS}
       PASSWORD_COST: ${PASSWORD_COST}
       SIGNING_KEY: ${SIGNING_KEY}
-      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_REGION: ${AWS_REGION}
-      AWS_IMAGE_BUCKET_NAME: ${MINIO_DEFAULT_BUCKET}
-      AWS_S3_ENDPOINT: ${S3_HOST}
+      AWS_IMAGE_BUCKET_NAME: ${AWS_IMAGE_BUCKET_NAME}
+      AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT}
       SLACK_INCOMING_WEB_HOOK: ${SLACK_INCOMING_WEB_HOOK}
       REPLYTO: "${REPLYTO}"
       MAILGUN_ADDRESS: "${MAILGUN_ADDRESS}"
@@ -143,13 +78,14 @@ services:
     command: /go/bin/web
     depends_on:
       - orchestrator
-      - minio-init
     networks:
-      - sr-network
+      - sr-internal
+      - db
+      - web
 
   rs-notes:
     container_name: sr-rs-notes
-    build: modules/RS-NOTES/
+    image: sr-server-rs-notes:latest
     environment:
       <<: *service_env
       API_PORT: ${ROOTSHOOT_NOTES_SERVICE_PORT}
@@ -159,11 +95,13 @@ services:
     depends_on:
       - orchestrator
     networks:
-      - sr-network
+      - sr-internal
+      - db
+      - web
 
   rs-groups:
     container_name: sr-rs-groups
-    build: modules/RS-GROUPS/
+    image: sr-server-rs-groups:latest
     environment:
       <<: *service_env
       API_PORT: ${ROOTSHOOT_GROUPS_SERVICE_PORT}
@@ -172,11 +110,13 @@ services:
     depends_on:
       - orchestrator
     networks:
-      - sr-network
+      - sr-internal
+      - db
+      - web
 
   rs-connections:
     container_name: sr-rs-connections
-    build: modules/RS-CONNECTIONS/
+    image: sr-server-rs-connections:latest
     environment:
       <<: *service_env
       API_PORT: ${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}
@@ -185,11 +125,13 @@ services:
     depends_on:
       - orchestrator
     networks:
-      - sr-network
+      - sr-internal
+      - db
+      - web
 
   rs-notifications:
     container_name: sr-rs-notifications
-    build: modules/RS-NOTIFICATIONS/
+    image: sr-server-rs-notifications:latest
     environment:
       <<: *service_env
       API_PORT: ${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}
@@ -199,11 +141,13 @@ services:
     depends_on:
       - orchestrator
     networks:
-      - sr-network
+      - sr-internal
+      - db
+      - web
 
   rs-notifications-cron:
     container_name: sr-rs-notifications-cron
-    build: modules/RS-NOTIFICATIONS/
+    image: sr-server-rs-notifications:latest
     environment:
       <<: *service_env
       POSTGRES_DB_NAME: ${DB_NAME_NOTIFICATIONS}
@@ -212,12 +156,13 @@ services:
     depends_on:
       - orchestrator
     networks:
-      - sr-network
+      - sr-internal
+      - db
     restart: unless-stopped
 
   rs-responses:
     container_name: sr-rs-responses
-    build: modules/RS-RESPONSES/
+    image: sr-server-rs-responses:latest
     environment:
       <<: *service_env
       API_PORT: ${ROOTSHOOT_RESPONSES_SERVICE_PORT}
@@ -226,11 +171,21 @@ services:
     depends_on:
       - orchestrator
     networks:
-      - sr-network
+      - sr-internal
+      - db
+      - web
 
   sr-email:
     container_name: sr-email
-    build: modules/SR-EMAIL/
+    image: sr-server-sr-email:latest
+    volumes:
+      - /srv/data/sr-server/emails:${EMAIL_STORE_DIR}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sr-email.rule=Host(`alpha.socialroots.io`) && PathPrefix(`/api/email/`)"
+      - "traefik.http.routers.sr-email.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sr-email.priority=50"
+      - "traefik.http.services.sr-email.loadbalancer.server.port=${SR_EMAIL_PORT}"
     environment:
       ENV: ${ENV}
       API_PORT: ${SR_EMAIL_PORT}
@@ -239,51 +194,40 @@ services:
       SR_INTERNAL_TOKEN: ${SR_INTERNAL_TOKEN}
       CRON_INTERVAL: ${SR_EMAIL_CRON_INTERVAL}
       EMAIL_STORE_DIR: ${EMAIL_STORE_DIR}
-    volumes:
-      - email_data:${EMAIL_STORE_DIR}
     networks:
-      - sr-network
+      - sr-internal
+      - web
     restart: unless-stopped
 
   sr-next:
     container_name: sr-next
-    restart: unless-stopped
     image: sr-next:${VERSION}
-    ports:
-      - "3000:3000"
+    restart: unless-stopped
+    environment:
+      - HOSTNAME=0.0.0.0
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sr-next.rule=Host(`alpha.socialroots.io`)"
+      - "traefik.http.routers.sr-next.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sr-next.priority=1"
+      - "traefik.http.services.sr-next.loadbalancer.server.port=${SR_NEXT_PORT}"
+      # Next.js internal API routes — must match before the orchestrator's
+      # wildcard /api/ rule so these are served by sr-next, not proxied.
+      - "traefik.http.routers.sr-next-build-id.rule=Host(`alpha.socialroots.io`) && PathPrefix(`/api/build-id`)"
+      - "traefik.http.routers.sr-next-build-id.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sr-next-build-id.priority=100"
     depends_on:
       - orchestrator
     networks:
-      - sr-network
-
-
-volumes:
-  postgres_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/postgresql
-  redis_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/redis
-  minio_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/minio
-  email_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/emails
+      - sr-internal
+      - web
 
 networks:
-  sr-network:
-    driver: bridge
-
+  sr-internal:
+    name: sr-internal
+  db:
+    name: infra-db
+    external: true
+  web:
+    name: infra-web
+    external: true

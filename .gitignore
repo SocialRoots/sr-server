@@ -5,3 +5,4 @@ data/postgresql/*
 data/redis/*
 data/minio/*
 data/logs/*
+data/emails/*
