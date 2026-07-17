@@ -180,3 +180,48 @@ Design discussions and proposals (e.g. new features, architectural changes) are 
 
 - `modules/ORCHESTRATOR/issues/0002-divergent-locatenotes-paths.md`
 - `modules/RS-USERS/issues/0001-email-change-feature.md`
+
+## OpenAPI-Based Public API
+
+New public-facing REST endpoints are designed spec-first using OpenAPI 3.0.
+The spec is the source of truth — Go types and server stubs are generated
+from it, not written by hand.
+
+### Where to find it
+
+- **Spec:** `pkg/api/openapi.yml` in each microservice module
+- **Generated code:** `pkg/api/server.gen.go` (check into repo, not .gitignore)
+- **Manual handler:** `pkg/api/handlers.go` (implements the generated `ServerInterface`)
+
+### Design principles
+
+1. **Server owns resources, client owns views.** Endpoints return lean entities
+   with key references, not embedded objects. The client composes higher-level
+   views via batch endpoints.
+
+2. **No locker contents.** Each endpoint returns only what its service owns.
+   User profiles, group info, and per-user state are fetched separately via
+   batch endpoints (`/users/batch`, `/groups/batch`, `/response/batch/note-stats`).
+
+3. **No capability keys in list responses.** The client opens a note by its
+   stable `id`; the server checks authz at the detail endpoint.
+
+4. **Authz follows the RS-GROUPS pattern.** IdentityMiddleware reads
+   `X-User-Key` header (set by orchestrator), per-route middleware gates
+   access (`requireSelf`, `requireAuth`), handler-level checks enforce
+   fine-grained rules.
+
+### Code generation
+
+```bash
+# Install the generator (once)
+go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+
+# Regenerate from the spec
+cd modules/[MODULE_NAME]
+./scripts/generate-api.sh
+```
+
+The generated file is checked into the repo so builds don't require the
+generator tooling. The `scripts/generate-api.sh` script exists in each
+module that has an OpenAPI spec.
