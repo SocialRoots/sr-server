@@ -1,30 +1,9 @@
 name: sr-server
+# Base = the deployable app stack, all services from ghcr.io images.
+# Environment-specific infrastructure (postgres, S3, mail, proxy) lives in
+# overlays: docker-compose.dev.yml (dev), docker-compose-traefik.yml (alpha/prod).
+# See docker-compose-postgres.yml for a standalone shared-postgres example.
 services:
-  postgres:
-    container_name: sr-postgres
-    image: postgres:17.5-alpine
-    environment: &db_env
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_HOST: ${POSTGRES_HOST}
-      POSTGRES_PORT: ${POSTGRES_PORT}
-    ports:
-      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
-    shm_size: "2gb"
-    command:
-      - "postgres"
-      - "-c"
-      - "shared_buffers=256MB"
-      - "-c"
-      - "temp_buffers=16MB"
-      - "-c"
-      - "work_mem=16MB"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - sr-network
-
   redis:
     container_name: sr-redis
     image: redis:8-alpine
@@ -32,35 +11,28 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    networks:
-      - sr-network
     restart: unless-stopped
     command: redis-server
 
-  mailhog:
-    container_name: sr-mailhog
-    image: mailhog/mailhog:latest
-    ports:
-      - "1025:1025"  # SMTP server
-      - "8025:8025"  # Web UI
-    networks:
-      - sr-network
-    restart: unless-stopped
-
   orchestrator:
     container_name: sr-orchestrator
-    build: modules/ORCHESTRATOR/
+    image: ghcr.io/socialroots/orchestrator:${VERSION}
     ports:
       - "${SR_ORCHESTRATOR_PORT}:${SR_ORCHESTRATOR_PORT}"
     environment: &orchestrator_env
-      <<: *db_env
       ENV: ${ENV}
       PORT: ${SR_ORCHESTRATOR_PORT}
       SR_API_PREFIX: ${SR_API_PREFIX}
       SR_SESSION_TTL_HOURS: ${SR_SESSION_TTL_HOURS}
       LOCALENV: ${LOCALENV}
-      POSTGRES_HOST: "sr-postgres"
-      REDIS_HOST: "sr-redis"
+      # DB/redis hosts are env-driven: dev overlay runs containers
+      # (sr-postgres, sr-redis); alpha/prod point at external ones.
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      REDIS_HOST: ${REDIS_HOST}
       REDIS_EXPIRATION: ${REDIS_EXPIRATION}
       DISABLE_CACHE: ${DISABLE_CACHE}
       PROFILING_ENABLED: ${PROFILING_ENABLED}
@@ -70,65 +42,25 @@ services:
       ROOTSHOOT_RESPONSES_SERVICE: "http://sr-rs-responses:${ROOTSHOOT_RESPONSES_SERVICE_PORT}"
       ROOTSHOOT_NOTIFICATIONS_SERVICE: "http://sr-rs-notifications:${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}"
       ROOTSHOOT_CONNECTIONS_SERVICE: "http://sr-rs-connections:${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}"
+      SR_EMAIL_GATEWAY: "http://sr-email:${SR_EMAIL_PORT}"
       WEB_APP_HOST: ${WEB_APP_HOST}
       POSTHOG_API_KEY: ${POSTHOG_API_KEY}
       SR_INTERNAL_TOKEN: ${SR_INTERNAL_TOKEN}
     command: /go/bin/api
     depends_on:
-      - postgres
       - redis
-    networks:
-      - sr-network
-
-  s3-minio:
-    container_name: sr-s3-minio
-    image: minio/minio:latest
-    ports:
-      - "${MINIO_API_PORT}:9000"
-      - "${MINIO_CONSOLE_PORT}:9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio_data:/data
-    networks:
-      - sr-network
-    restart: unless-stopped
-
-  minio-init:
-    image: minio/mc:latest
-    container_name: sr-minio-init
-    depends_on:
-      - s3-minio
-    environment:
-      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
-      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
-      S3_HOST: ${S3_HOST}
-    entrypoint: >
-      /bin/sh -c "
-      sleep 10;
-      /usr/bin/mc alias set srminio ${S3_HOST} ${MINIO_ROOT_USER} 
-      ${MINIO_ROOT_PASSWORD};
-      /usr/bin/mc mb srminio/${MINIO_DEFAULT_BUCKET} --ignore-existing;
-      /usr/bin/mc anonymous set public srminio/${MINIO_DEFAULT_BUCKET};
-      /usr/bin/mc admin user add srminio ${S3_ACCESS_KEY_ID} ${S3_SECRET_ACCESS_KEY};
-      /usr/bin/mc admin policy attach srminio readwrite --user ${S3_ACCESS_KEY_ID};
-      echo 'Bucket and access keys configured successfully';
-      exit 0;
-      "
-    networks:
-      - sr-network
 
   rs-users:
     container_name: sr-rs-users
-    build: modules/RS-USERS/
+    image: ghcr.io/socialroots/rs-users:${VERSION}
     environment: &service_env
       <<: *orchestrator_env
       API_PORT: ${ROOTSHOOT_USERS_SERVICE_PORT}
       POSTGRES_DB_NAME: ${DB_NAME_USERS}
       PASSWORD_COST: ${PASSWORD_COST}
       SIGNING_KEY: ${SIGNING_KEY}
+      # S3 config is env-driven: point S3_HOST/AWS_* at AWS S3 today, or at a
+      # future local MinIO (see docker-compose.minio.yml) without compose changes.
       AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
       AWS_REGION: ${AWS_REGION}
@@ -143,13 +75,10 @@ services:
     command: /go/bin/web
     depends_on:
       - orchestrator
-      - minio-init
-    networks:
-      - sr-network
 
   rs-notes:
     container_name: sr-rs-notes
-    build: modules/RS-NOTES/
+    image: ghcr.io/socialroots/rs-notes:${VERSION}
     environment:
       <<: *service_env
       API_PORT: ${ROOTSHOOT_NOTES_SERVICE_PORT}
@@ -158,12 +87,10 @@ services:
     command: /go/bin/web
     depends_on:
       - orchestrator
-    networks:
-      - sr-network
 
   rs-groups:
     container_name: sr-rs-groups
-    build: modules/RS-GROUPS/
+    image: ghcr.io/socialroots/rs-groups:${VERSION}
     environment:
       <<: *service_env
       API_PORT: ${ROOTSHOOT_GROUPS_SERVICE_PORT}
@@ -171,12 +98,10 @@ services:
     command: /go/bin/web
     depends_on:
       - orchestrator
-    networks:
-      - sr-network
 
   rs-connections:
     container_name: sr-rs-connections
-    build: modules/RS-CONNECTIONS/
+    image: ghcr.io/socialroots/rs-connections:${VERSION}
     environment:
       <<: *service_env
       API_PORT: ${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}
@@ -184,12 +109,10 @@ services:
     command: /go/bin/web
     depends_on:
       - orchestrator
-    networks:
-      - sr-network
 
   rs-notifications:
     container_name: sr-rs-notifications
-    build: modules/RS-NOTIFICATIONS/
+    image: ghcr.io/socialroots/rs-notifications:${VERSION}
     environment:
       <<: *service_env
       API_PORT: ${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}
@@ -198,12 +121,10 @@ services:
     command: /go/bin/web
     depends_on:
       - orchestrator
-    networks:
-      - sr-network
 
   rs-notifications-cron:
     container_name: sr-rs-notifications-cron
-    build: modules/RS-NOTIFICATIONS/
+    image: ghcr.io/socialroots/rs-notifications:${VERSION}
     environment:
       <<: *service_env
       POSTGRES_DB_NAME: ${DB_NAME_NOTIFICATIONS}
@@ -211,13 +132,11 @@ services:
     command: sh -c "while true; do /go/bin/cron; sleep 300; done"
     depends_on:
       - orchestrator
-    networks:
-      - sr-network
     restart: unless-stopped
 
   rs-responses:
     container_name: sr-rs-responses
-    build: modules/RS-RESPONSES/
+    image: ghcr.io/socialroots/rs-responses:${VERSION}
     environment:
       <<: *service_env
       API_PORT: ${ROOTSHOOT_RESPONSES_SERVICE_PORT}
@@ -225,12 +144,10 @@ services:
     command: /go/bin/web
     depends_on:
       - orchestrator
-    networks:
-      - sr-network
 
   sr-email:
     container_name: sr-email
-    build: modules/SR-EMAIL/
+    image: ghcr.io/socialroots/sr-email:${VERSION}
     environment:
       ENV: ${ENV}
       API_PORT: ${SR_EMAIL_PORT}
@@ -241,41 +158,37 @@ services:
       EMAIL_STORE_DIR: ${EMAIL_STORE_DIR}
     volumes:
       - email_data:${EMAIL_STORE_DIR}
-    networks:
-      - sr-network
     restart: unless-stopped
+    depends_on:
+      - rs-users
+      - rs-notes
 
   sr-next:
     container_name: sr-next
     restart: unless-stopped
-    image: sr-next:${VERSION}
+    image: ghcr.io/socialroots/sr-next:${VERSION}
+    environment:
+      # Runtime config for the web app — read at container BOOT, not baked
+      # into the image at build time. Consumed via publicRuntimeConfig in
+      # modules/SR-NEXT/next.config.js (see sr-next/.env.model).
+      HOSTNAME: "0.0.0.0"
+      POSTHOG_TOKEN: ${POSTHOG_TOKEN}
+      POSTHOG_HOST: ${POSTHOG_HOST}
+      POLL_INTERVAL: ${POLL_INTERVAL}
+      CONNECT_ORG_FORM_LINK: ${CONNECT_ORG_FORM_LINK}
     ports:
       - "3000:3000"
     depends_on:
       - orchestrator
-    networks:
-      - sr-network
 
 
 volumes:
-  postgres_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/postgresql
   redis_data:
     driver: local
     driver_opts:
       type: none
       o: bind
       device: ./data/redis
-  minio_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/minio
   email_data:
     driver: local
     driver_opts:
@@ -283,7 +196,4 @@ volumes:
       o: bind
       device: ./data/emails
 
-networks:
-  sr-network:
-    driver: bridge
 

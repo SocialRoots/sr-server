@@ -1,0 +1,199 @@
+# DEVELOPMENT overlay: build app images locally AND run dev-only
+# infrastructure (postgres, minio, mailhog).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# The base docker-compose.yml references ghcr.io images and NO infra, so it
+# deploys unchanged on servers (postgres/S3 are external there — see
+# docker-compose-postgres.yml and docker-compose.minio.yml). This overlay is
+# dev-only: it is never deployed.
+name: sr-server
+
+services:
+  # --- dev-only infrastructure -------------------------------------------
+  redis:
+    # Base has no networks: (app services attach via this overlay). Redis
+    # MUST be on sr-network or the orchestrator can't resolve/reach it —
+    # a missing networks: here strands it on the compose default network
+    # and DNS falls back to 127.0.0.1 (connection refused).
+    networks:
+      - sr-network
+
+  postgres:
+    container_name: sr-postgres
+    image: postgres:17.5-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+    ports:
+      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+    shm_size: "2gb"
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "temp_buffers=16MB"
+      - "-c"
+      - "work_mem=16MB"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - sr-network
+
+  s3-minio:
+    container_name: sr-s3-minio
+    image: minio/minio:latest
+    ports:
+      - "${MINIO_API_PORT}:9000"
+      - "${MINIO_CONSOLE_PORT}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - sr-network
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: sr-minio-init
+    depends_on:
+      - s3-minio
+    environment:
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      S3_HOST: ${S3_HOST}
+    entrypoint: >
+      /bin/sh -c "
+      sleep 10;
+      /usr/bin/mc alias set srminio ${S3_HOST} ${MINIO_ROOT_USER}
+      ${MINIO_ROOT_PASSWORD};
+      /usr/bin/mc mb srminio/${MINIO_DEFAULT_BUCKET} --ignore-existing;
+      /usr/bin/mc anonymous set public srminio/${MINIO_DEFAULT_BUCKET};
+      /usr/bin/mc admin user add srminio ${S3_ACCESS_KEY_ID} ${S3_SECRET_ACCESS_KEY};
+      /usr/bin/mc admin policy attach srminio readwrite --user ${S3_ACCESS_KEY_ID};
+      echo 'Bucket and access keys configured successfully';
+      exit 0;
+      "
+    networks:
+      - sr-network
+
+  mailhog:
+    # Mailpit (axllent/mailpit) is the maintained drop-in replacement for
+    # MailHog (unmaintained since 2020). Same ports + compatible API; it
+    # correctly decodes quoted-printable soft line breaks that MailHog's UI
+    # mangles (MailHog/MailHog-UI#35) — which broke magic-link emails.
+    # Service name stays `mailhog` so .env MAILGUN_HOST=sr-mailhog keeps
+    # resolving to this container.
+    container_name: sr-mailhog
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    networks:
+      - sr-network
+    restart: unless-stopped
+
+  # --- dev-only ordering: local infra before app services -----------------
+  orchestrator:
+    build: modules/ORCHESTRATOR/
+    depends_on:
+      - postgres
+    networks:
+      - sr-network
+    environment: &orchestrator_env
+      # Override .env's host-facing values (localhost) with in-network names.
+      # Inherited by rs-* via <<: *orchestrator_env (same anchor as base).
+      POSTGRES_HOST: sr-postgres
+      REDIS_HOST: sr-redis
+
+  rs-users:
+    build: modules/RS-USERS/
+    depends_on:
+      - minio-init
+    networks:
+      - sr-network
+    environment:
+      <<: *orchestrator_env
+
+  rs-notes:
+    build: modules/RS-NOTES/
+    networks:
+      - sr-network
+    environment:
+      <<: *orchestrator_env
+
+  rs-groups:
+    build: modules/RS-GROUPS/
+    networks:
+      - sr-network
+    environment:
+      <<: *orchestrator_env
+
+  rs-connections:
+    build: modules/RS-CONNECTIONS/
+    networks:
+      - sr-network
+    environment:
+      <<: *orchestrator_env
+
+  rs-notifications:
+    build: modules/RS-NOTIFICATIONS/
+    networks:
+      - sr-network
+    environment:
+      <<: *orchestrator_env
+
+  rs-notifications-cron:
+    build: modules/RS-NOTIFICATIONS/
+    networks:
+      - sr-network
+    environment:
+      <<: *orchestrator_env
+
+  rs-responses:
+    build: modules/RS-RESPONSES/
+    networks:
+      - sr-network
+    environment:
+      <<: *orchestrator_env
+
+  sr-email:
+    build: modules/SR-EMAIL/
+    # sr-email exposes the inbound webhook (POST /api/email/inbound) that
+    # external mail systems call to deliver replies. Public on alpha via the
+    # traefik label; here we publish the same port on the host for dev.
+    ports:
+      - "${SR_EMAIL_PORT}:${SR_EMAIL_PORT}"
+    networks:
+      - sr-network
+
+  sr-next:
+    # sr-next's Dockerfile packages the pre-built .next/standalone output,
+    # so run `yarn build` inside modules/SR-NEXT before `up --build`.
+    build: modules/SR-NEXT
+    networks:
+      - sr-network
+
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/postgresql
+  minio_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/minio
+
+networks:
+  sr-network:
+    driver: bridge

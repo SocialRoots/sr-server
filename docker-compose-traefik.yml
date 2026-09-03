@@ -1,226 +1,100 @@
-# Deployment compose for SocialRoots server.
-# Build images from /srv/SW/sr-server/ using the source repo's docker-compose.yml,
-# then deploy here with: docker compose up -d
-
+# ALPHA/PROD deployment overlay — used with the base docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose-traefik.yml up -d
+#
+# Carries only what differs on a Traefik-fronted server: routing labels,
+# external shared networks, /srv data volumes. Images, env, depends_on and
+# base volumes come from docker-compose.yml.
+#
+# Network topology: only the edge services (orchestrator, sr-email, sr-next)
+# are attached to the Traefik `web` network. Backend rs-* modules are
+# internal-only (sr-internal + db) — they are reached exclusively through the
+# orchestrator.
 name: sr-server
 
 services:
   redis:
-    container_name: sr-redis
-    image: redis:8-alpine
     volumes:
       - /srv/data/sr-server/redis:/data
     networks:
       - sr-internal
-    restart: unless-stopped
-    command: redis-server
 
   orchestrator:
-    container_name: sr-orchestrator
-    image: sr-server-orchestrator:latest
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.sr-orc.rule=Host(`alpha.socialroots.io`) && PathPrefix(`/api/`)"
+      - "traefik.http.routers.sr-orc.rule=Host(`${SR_PUBLIC_HOST}`) && PathPrefix(`/api/`)"
       - "traefik.http.routers.sr-orc.priority=80"
       - "traefik.http.routers.sr-orc.tls.certresolver=letsencrypt"
       - "traefik.http.services.sr-orc.loadbalancer.server.port=${SR_ORCHESTRATOR_PORT}"
-      - "traefik.http.routers.sr-orc-query.rule=Host(`alpha.socialroots.io`) && Path(`/query`)"
+      - "traefik.http.routers.sr-orc-query.rule=Host(`${SR_PUBLIC_HOST}`) && Path(`/query`)"
       - "traefik.http.routers.sr-orc-query.priority=70"
       - "traefik.http.routers.sr-orc-query.tls.certresolver=letsencrypt"
       - "traefik.http.routers.sr-orc-query.service=sr-orc"
-    environment: &orchestrator_env
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: ${POSTGRES_PORT}
-      ENV: ${ENV}
-      PORT: ${SR_ORCHESTRATOR_PORT}
-      LOCALENV: ${LOCALENV}
-      REDIS_HOST: "sr-redis"
-      REDIS_EXPIRATION: ${REDIS_EXPIRATION}
-      REDIS_KEY_HASH: ${REDIS_KEY_HASH}
-      DISABLE_CACHE: ${DISABLE_CACHE}
-      PROFILING_ENABLED: ${PROFILING_ENABLED}
-      ROOTSHOOT_USERS_SERVICE: "http://sr-rs-users:${ROOTSHOOT_USERS_SERVICE_PORT}"
-      ROOTSHOOT_GROUPS_SERVICE: "http://sr-rs-groups:${ROOTSHOOT_GROUPS_SERVICE_PORT}"
-      ROOTSHOOT_NOTES_SERVICE: "http://sr-rs-notes:${ROOTSHOOT_NOTES_SERVICE_PORT}"
-      ROOTSHOOT_RESPONSES_SERVICE: "http://sr-rs-responses:${ROOTSHOOT_RESPONSES_SERVICE_PORT}"
-      ROOTSHOOT_NOTIFICATIONS_SERVICE: "http://sr-rs-notifications:${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}"
-      ROOTSHOOT_CONNECTIONS_SERVICE: "http://sr-rs-connections:${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}"
-      POSTHOG_API_KEY: ${POSTHOG_API_KEY}
-      SR_INTERNAL_TOKEN: ${SR_INTERNAL_TOKEN}
-    command: /go/bin/api
-    depends_on:
-      - redis
     networks:
       - sr-internal
       - db
       - web
 
   rs-users:
-    container_name: sr-rs-users
-    image: sr-server-rs-users:latest
-    environment: &service_env
-      <<: *orchestrator_env
-      API_PORT: ${ROOTSHOOT_USERS_SERVICE_PORT}
-      POSTGRES_DB_NAME: ${DB_NAME_USERS}
-      PASSWORD_COST: ${PASSWORD_COST}
-      SIGNING_KEY: ${SIGNING_KEY}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_REGION: ${AWS_REGION}
-      AWS_IMAGE_BUCKET_NAME: ${AWS_IMAGE_BUCKET_NAME}
-      AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT}
-      SLACK_INCOMING_WEB_HOOK: ${SLACK_INCOMING_WEB_HOOK}
-      REPLYTO: "${REPLYTO}"
-      MAILGUN_ADDRESS: "${MAILGUN_ADDRESS}"
-      MAILGUN_USERNAME: "${MAILGUN_USERNAME}"
-      MAILGUN_PASSWORD: "${MAILGUN_PASSWORD}"
-      MAILGUN_HOST: "${MAILGUN_HOST}"
-    command: /go/bin/web
-    depends_on:
-      - orchestrator
     networks:
       - sr-internal
       - db
-      - web
 
   rs-notes:
-    container_name: sr-rs-notes
-    image: sr-server-rs-notes:latest
-    environment:
-      <<: *service_env
-      API_PORT: ${ROOTSHOOT_NOTES_SERVICE_PORT}
-      POSTGRES_DB_NAME: ${DB_NAME_NOTES}
-      EMAIL_WHITELIST: "${EMAIL_WHITELIST}"
-    command: /go/bin/web
-    depends_on:
-      - orchestrator
     networks:
       - sr-internal
       - db
-      - web
 
   rs-groups:
-    container_name: sr-rs-groups
-    image: sr-server-rs-groups:latest
-    environment:
-      <<: *service_env
-      API_PORT: ${ROOTSHOOT_GROUPS_SERVICE_PORT}
-      POSTGRES_DB_NAME: ${DB_NAME_GROUPS}
-    command: /go/bin/web
-    depends_on:
-      - orchestrator
     networks:
       - sr-internal
       - db
-      - web
 
   rs-connections:
-    container_name: sr-rs-connections
-    image: sr-server-rs-connections:latest
-    environment:
-      <<: *service_env
-      API_PORT: ${ROOTSHOOT_CONNECTIONS_SERVICE_PORT}
-      POSTGRES_DB_NAME: ${DB_NAME_CONNECTIONS}
-    command: /go/bin/web
-    depends_on:
-      - orchestrator
     networks:
       - sr-internal
       - db
-      - web
 
   rs-notifications:
-    container_name: sr-rs-notifications
-    image: sr-server-rs-notifications:latest
-    environment:
-      <<: *service_env
-      API_PORT: ${ROOTSHOOT_NOTIFICATIONS_SERVICE_PORT}
-      POSTGRES_DB_NAME: ${DB_NAME_NOTIFICATIONS}
-      LOCAL_OVERRIDES: ""
-    command: /go/bin/web
-    depends_on:
-      - orchestrator
     networks:
       - sr-internal
       - db
-      - web
 
   rs-notifications-cron:
-    container_name: sr-rs-notifications-cron
-    image: sr-server-rs-notifications:latest
-    environment:
-      <<: *service_env
-      POSTGRES_DB_NAME: ${DB_NAME_NOTIFICATIONS}
-      LOCAL_OVERRIDES: ""
-    command: sh -c "while true; do /go/bin/cron; sleep 300; done"
-    depends_on:
-      - orchestrator
     networks:
       - sr-internal
       - db
-    restart: unless-stopped
 
   rs-responses:
-    container_name: sr-rs-responses
-    image: sr-server-rs-responses:latest
-    environment:
-      <<: *service_env
-      API_PORT: ${ROOTSHOOT_RESPONSES_SERVICE_PORT}
-      POSTGRES_DB_NAME: ${DB_NAME_RESPONSES}
-    command: /go/bin/web
-    depends_on:
-      - orchestrator
     networks:
       - sr-internal
       - db
-      - web
 
   sr-email:
-    container_name: sr-email
-    image: sr-server-sr-email:latest
     volumes:
       - /srv/data/sr-server/emails:${EMAIL_STORE_DIR}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.sr-email.rule=Host(`alpha.socialroots.io`) && PathPrefix(`/api/email/`)"
+      - "traefik.http.routers.sr-email.rule=Host(`${SR_PUBLIC_HOST}`) && PathPrefix(`/api/email/`)"
       - "traefik.http.routers.sr-email.tls.certresolver=letsencrypt"
       - "traefik.http.routers.sr-email.priority=90"
       - "traefik.http.services.sr-email.loadbalancer.server.port=${SR_EMAIL_PORT}"
-    environment:
-      ENV: ${ENV}
-      API_PORT: ${SR_EMAIL_PORT}
-      MAILGUN_API_KEY: ${MAILGUN_API_KEY}
-      ROOTSHOOT_RESPONSES_SERVICE: "http://sr-rs-responses:${ROOTSHOOT_RESPONSES_SERVICE_PORT}"
-      SR_INTERNAL_TOKEN: ${SR_INTERNAL_TOKEN}
-      CRON_INTERVAL: ${SR_EMAIL_CRON_INTERVAL}
-      EMAIL_STORE_DIR: ${EMAIL_STORE_DIR}
     networks:
       - sr-internal
       - web
-    restart: unless-stopped
 
   sr-next:
-    container_name: sr-next
-    image: sr-next:${VERSION}
-    restart: unless-stopped
-    environment:
-      - HOSTNAME=0.0.0.0
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.sr-next.rule=Host(`alpha.socialroots.io`)"
+      - "traefik.http.routers.sr-next.rule=Host(`${SR_PUBLIC_HOST}`)"
       - "traefik.http.routers.sr-next.tls.certresolver=letsencrypt"
       - "traefik.http.routers.sr-next.priority=1"
       - "traefik.http.services.sr-next.loadbalancer.server.port=${SR_NEXT_PORT}"
       # Next.js internal API routes — must match before the orchestrator's
       # wildcard /api/ rule so these are served by sr-next, not proxied.
-      - "traefik.http.routers.sr-next-build-id.rule=Host(`alpha.socialroots.io`) && PathPrefix(`/api/build-id`)"
+      - "traefik.http.routers.sr-next-build-id.rule=Host(`${SR_PUBLIC_HOST}`) && PathPrefix(`/api/build-id`)"
       - "traefik.http.routers.sr-next-build-id.tls.certresolver=letsencrypt"
       - "traefik.http.routers.sr-next-build-id.priority=100"
-    depends_on:
-      - orchestrator
     networks:
       - sr-internal
       - web

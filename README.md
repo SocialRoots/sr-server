@@ -12,9 +12,10 @@ server. It uses Docker and Compose to start all the needed components:
   - SR Groups microservice
   - SR Notifications microservice
   - SR Connections microservice
-  - SR-Email — email services for the Socialroots server (receives replies via webhooks, queues and forwards them)
-  - SR Utils (a shared library with commonly used stuff)
-  - [ToDo] A mock email server??
+  - SR-Email — the email module: inbound (Mailgun webhooks → reply parsing →
+    inbox) today; outbound (templates + SMTP) is being consolidated into it
+  - SR Utils (a shared library with commonly used stuff, including the shared
+    authz layer)
 
 (*) Obs: All SR services are added as Git Submodules.
 
@@ -54,14 +55,14 @@ server. It uses Docker and Compose to start all the needed components:
      3. **The services available are:**
         1. redis
         2. minio-init
-        2. orchestrator
-        2. rs-users
-        3. rs-groups
-        4. rs-connections
-        5. rs-notes
-        6. rs-notifications
-        7. rs-responses
-     8. sr-email
+        3. orchestrator
+        4. rs-users
+        5. rs-groups
+        6. rs-connections
+        7. rs-notes
+        8. rs-notifications
+        9. rs-responses
+       10. sr-email
 
   5. Configure name resolving of your computer to see the services by name.
      (There are many ways to do that, and this is the easiest one for Linux/MaxOS)
@@ -91,6 +92,28 @@ will need to adjust it accordingly.
   as the uploaded files will be saved to the database pointing to that URL.
   The best case scenario here is that you will have a permanent, public 
   facing name (like https://images.socialroots.io).
+
+## Public API
+
+The public API is **migrating from GraphQL to a spec-first OpenAPI (REST)
+surface**. New endpoints are designed in each microservice's
+`pkg/api/openapi.yml` (the spec is the source of truth; Go types are
+generated). **When the migration is complete, the GraphQL layer is
+removed.**
+
+- All traffic flows through the ORCHESTRATOR: `/api/{service}/*` is
+  forwarded to the backend microservice (see `routeMap` in
+  `modules/ORCHESTRATOR/pkg/api/api.go`).
+- Live specs (public, no auth needed):
+  - `/api/users/openapi.json`
+  - `/api/groups/openapi.json`
+  - `/api/responses/openapi.json`
+  - `/api/notes/openapi.json`
+- Auth: login/register exchanges a one-time magic key for a `session_token`
+  (JWT + Redis session cache); subsequent requests send it as a bearer
+  token. Pre-auth paths (login, register, capKey exchange, spec files) are
+  whitelisted in `publicPrefixes` in
+  `modules/ORCHESTRATOR/pkg/auth/auth.go`.
 
 ## Deprecating an HTTP endpoint
 

@@ -1,0 +1,32 @@
+# Standalone MinIO S3 for alpha/prod — NOT part of the sr-server stack.
+# Future home of object storage: run this on the host, then point sr-server's
+# .env at it (S3_HOST=http://<this-container>:9000). Today sr-server's .env
+# points at AWS S3 (S3_HOST=s3.amazonaws.com + AWS_*) — no compose changes
+# needed to switch, only the .env values.
+#
+# Usage:
+#   cp .env.model .env          # edit MINIO_* / S3_* values
+#   docker compose up -d
+name: sr-minio
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: sr-s3-minio
+    restart: unless-stopped
+    ports:
+      - "${MINIO_API_PORT}:9000"
+      - "${MINIO_CONSOLE_PORT}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    volumes:
+      - /srv/data/minio:/data
+    networks:
+      - db
+
+networks:
+  db:
+    name: infra-db
+    external: true

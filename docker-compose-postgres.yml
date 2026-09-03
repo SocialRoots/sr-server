@@ -1,0 +1,40 @@
+# Standalone shared PostgreSQL for alpha/prod — NOT part of the sr-server
+# stack. Run this on the host (e.g. /srv/docker/postgres/) so multiple
+# service stacks can attach to the same DB over the external `infra-db`
+# network. sr-server only joins that network and points POSTGRES_HOST at the
+# container name below.
+#
+# Usage (on the server):
+#   cp .env.model .env          # edit POSTGRES_* values
+#   docker compose up -d
+#
+# sr-server side: docker-compose-traefik.yml attaches services to the `db`
+# network; .env sets POSTGRES_HOST=postgres (the container_name here).
+name: sr-postgres
+
+services:
+  db:
+    image: postgres:17.5-alpine
+    container_name: postgres
+    restart: always
+    env_file: ".env"
+    shm_size: "2gb"
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "temp_buffers=16MB"
+      - "-c"
+      - "work_mem=16MB"
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - /srv/data/postgres/data:/var/lib/postgresql/data
+    networks:
+      - db
+
+networks:
+  db:
+    name: infra-db
+    external: true

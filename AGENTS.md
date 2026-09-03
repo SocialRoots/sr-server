@@ -11,14 +11,15 @@ SR-Server is a microservices-based social platform built with Go and Docker. The
 - **RS-GROUPS**: Group creation, membership management, and group-based permissions
 - **RS-NOTES**: Note creation, messaging, and content management with email templating
 - **RS-RESPONSES**: Response tracking, reactions, and reply management
-- **RS-NOTIFICATIONS**: Notification delivery, summaries, and in-app notifications
+- **RS-NOTIFICATIONS**: Notification aggregation — digests (cron), in-app state (touch/volume/mentions)
+- **SR-EMAIL**: Email module — inbound Mailgun webhooks + reply parsing today; outbound (templates + SMTP from RS-NOTES `pkg/mailer`) is being consolidated here
 - **RS-CONNECTIONS**: User connections and relationship management
 
 Each microservice is a separate Go module with its own database, migrations, and API endpoints. Services communicate via HTTP APIs and share data through PostgreSQL databases and Redis caching.
 
 ### Shared Libraries
 
-- **RS-UTILS** (`modules/RS-UTILS`): Shared utilities library providing common functionality across microservices including Nostr identity management, key generation, password hashing, and storage interfaces. Used as a local dependency by other services to eliminate code duplication.
+- **RS-UTILS** (`modules/RS-UTILS`): Shared utilities library providing common functionality across microservices including Nostr identity management, key generation, password hashing, storage interfaces, and the shared **authz** layer (membership lookups, roles, identity middleware). Used as a local dependency by other services to eliminate code duplication.
 
 ## Common Development Commands
 
@@ -106,20 +107,28 @@ go run cmd/script/main.go  # Run utility scripts
 
 ### Shared Library Integration
 - **RS-UTILS** library is referenced as a local dependency using Go replace directives
-- Microservices use `replace github.com/SocialRoots/sr-microservices-utils => ../RS-UTILS` in go.mod
+- Microservices use `replace github.com/SocialRoots/rootshoots-utils => ../RS-UTILS` in go.mod
 - Library provides common functionality: Nostr identity management, UUID key generation, password hashing, storage interfaces
+- **`authz` is the security core**: membership lookups, role hierarchy, `RequireGroupMember`, `FilterActiveGroupKeys`, `FilterGroupContacts`, identity middleware (`ginmw`) — all authz decisions live here, never in handlers
 - Eliminates code duplication and ensures consistent behavior across services
 
 ### Testing Framework
-- Uses Ginkgo BDD testing framework with Gomega matchers
-- Tests run with race condition detection enabled
+- Standard Go `testing` package (no Ginkgo/Gomega)
+- Tests run with race condition detection enabled (`scripts/test_data_race.sh`)
 - Test databases configured via `.env.test` files
+- Each test package provisions its own isolated database via a `TestMain` that calls `utilsdb.SetupTestDB` (see `RS-USERS/pkg/db/main_test.go`) — this replaces the legacy `db.TestDB` / `x-socialroots-testmode` mechanism
 - Integration tests communicate with other services via HTTP clients
 
 ### Testing Best Practices
 - **IMPORTANT**: Tests use a dedicated test DATABASE (`rootshoot-tests`), NOT `_test` suffixed tables
 - Do NOT use `TestCk()` or similar table suffix functions in tests - use the main table names
 - The `.env.test` file points to the test database, so migrations create tables with normal names there
+- **Test file organization**: name test files after the surface they cover, not the implementation file
+  (e.g. `groupsinfo_test.go` for `GET /groups/info`, not `handlers_test.go`). Shared test helpers live in
+  `pkg/dbtest/`; package-internal shared helpers live in `helpers_test.go`.
+- **Batch endpoints**: when a batch endpoint may omit requested keys (authz filter, not-found), the response
+  must include the omitted keys explicitly (e.g. `dropped: [...]`) so callers can distinguish "intentionally
+  filtered" from a server error.
 - **IMPORTANT**: The test database is shared across modules. Before running migrations for a module, you must reset the database:
   ```bash
   PGPASSWORD='th15.R00TZ' psql -U socialroots -h localhost -d rootshoot-tests -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO socialroots;"
@@ -128,7 +137,36 @@ go run cmd/script/main.go  # Run utility scripts
 - To run tests: `set -a && source .env.test && set +a && go test -v ./pkg/db`
 
 ### Security & Authentication
-- ORCHESTRATOR handles authentication and authorization
+
+**The public API is migrating from GraphQL to spec-first OpenAPI (REST).
+When the move finishes, the GraphQL layer is removed.** New endpoints are
+spec-first (`pkg/api/openapi.yml`); legacy routes stay until migrated.
+
+- **ORCHESTRATOR is the only edge.** All traffic goes through it:
+  - `routeMap` forwards `/api/{service}/*` to the backend microservice
+  - `publicPrefixes` (`pkg/auth/auth.go`) whitelists pre-auth paths and why:
+    `/user/login`, `/user/authenticate/`, `/user/register/`, the capKey
+    exchange, and each module's `/openapi.json`
+  - `denyList` returns `410 Gone` for deprecated endpoints
+- **Identity chain.** `ginmw.IdentityMiddleware` reads the user-key header →
+  `ginmw.RequireUserSession` validates the session token → the handler reads
+  the identity from `httpclient.UserKeyFromCtx`. Never trust a user key that
+  did not come from ctx; batch endpoints re-check authz per key.
+- **Session model.** Magic-link and register keys are one-time (deleted on
+  use); auth sessions are rows upserted into the users DB; the returned
+  `session_token` is cached in Redis (`session:<token>`) for fast
+  orchestrator validation; the JWT carries the auth token as a claim.
+- **Authz decisions live in `utils.authz` only** (`RequireGroupMember`,
+  `FilterActiveGroupKeys`, `FilterGroupContacts`, `ConfigureMembershipLookup`).
+  Handlers must not hand-roll membership SQL; configure a resolver (direct
+  DB or HTTP) at startup instead.
+- **Info-leak discipline.** Expose resource keys (`keys.MakeKey()`), never
+  table PKs or emails; silent authz drops are reported explicitly
+  (`dropped: [...]`); OpenAPI descriptions are consumer-facing and must not
+  leak internals (locker items, table names); examples use realistic values.
+- **Test-mode is deprecated / slated for removal.** `x-socialroots-testmode`
+  header + `db.TestDB` is a legacy backdoor that must never be reachable in
+  production; per-package `utilsdb.SetupTestDB` replaces it.
 - Services validate requests through user tokens and service keys
 - Database connections use dedicated PostgreSQL users
 - Service-to-service communication secured within Docker network
@@ -203,13 +241,23 @@ from it, not written by hand.
    User profiles, group info, and per-user state are fetched separately via
    batch endpoints (`/users/batch`, `/groups/batch`, `/response/batch/note-stats`).
 
-3. **No capability keys in list responses.** The client opens a note by its
-   stable `id`; the server checks authz at the detail endpoint.
+3. **Expose resource keys, never table PKs.** The integer `notes.id` / `users.id`
+   are internal serial keys and must not leak to clients. Notes use their own
+   non-enumerable key (`notes.link`, `keys.MakeKey()`) as the canonical
+   external identifier; list responses carry key references, and the client
+   opens detail (`GET /notes/{noteKey}`, `GET /notes/cap/{capKey}`) — not the
+   integer id. Authz is checked at the detail endpoint.
 
-4. **Authz follows the RS-GROUPS pattern.** IdentityMiddleware reads
-   `X-User-Key` header (set by orchestrator), per-route middleware gates
-   access (`requireSelf`, `requireAuth`), handler-level checks enforce
-   fine-grained rules.
+4. **Authz is enforced in the handler, via `utils.authz`.** The generated Gin
+   router (`RegisterHandlers`) is a mechanical byproduct of `openapi.yml` and
+   must NOT be the source of truth for routes. `RegisterPublicAPI` wires:
+   openapi.json route (public) → `ginmw.IdentityMiddleware` →
+   `ginmw.RequireUserSession` → `RegisterHandlers(router, h)`. Each handler
+   then re-checks its per-endpoint rule with `utils.authz`
+   (`RequireGroupMember`, `FilterActiveGroupKeys`, `FilterGroupContacts`, …)
+   reading identity from ctx. This replaces the old per-route GOPS
+   middleware-table style; all modules use the same pattern once migrated to
+   OpenAPI.
 
 ### Code generation
 
@@ -225,3 +273,31 @@ cd modules/[MODULE_NAME]
 The generated file is checked into the repo so builds don't require the
 generator tooling. The `scripts/generate-api.sh` script exists in each
 module that has an OpenAPI spec.
+
+### OpenAPI gotchas (learned the hard way)
+
+- **Each module's `/openapi.json` needs an orchestrator `publicPrefixes`
+  entry** — otherwise the spec is 401 from outside. Add it when a module
+  first exposes an OpenAPI surface (RESPONSES and GROUPS both hit this).
+- **First regen also needs `oapi-codegen/runtime` + `yaml.v3` in go.mod**
+  plus `go mod vendor` — the generated `server.gen.go` won't build in
+  vendor mode without them.
+- **Spec descriptions are a public contract** — consumer-facing only; no
+  internals (locker items, table origins). Examples must be realistic
+  (32-char hex keys from `keys.MakeKey()`), not placeholder slugs.
+- **Test files follow the surface they cover** (`groupsinfo_test.go`), not
+  `handlers_test.go`; shared helpers live in `pkg/dbtest/`.
+
+### Migration status
+
+- **Live OpenAPI surfaces** (each has a generated `server.gen.go`, handler
+  tests, and a public spec JSON):
+  - USERS `/users/profiles`
+  - GROUPS `/groups/info`
+  - RESPONSES `/responses/status`
+  - NOTES `/notes/{noteKey}` (detail), `/notes/user/{userKey}` (list),
+    `/notes/group/{groupKey}` (group list)
+- **Planned**: USERS login (`/users/login` + magic-key redeem), RESPONSES
+  batch stats, later mutations/cap routes.
+- **End state**: GraphQL layer in ORCHESTRATOR is removed once all
+  migrated endpoints have REST equivalents.
