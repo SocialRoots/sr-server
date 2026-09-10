@@ -156,12 +156,21 @@ services:
       SR_INTERNAL_TOKEN: ${SR_INTERNAL_TOKEN}
       CRON_INTERVAL: ${SR_EMAIL_CRON_INTERVAL}
       EMAIL_STORE_DIR: ${EMAIL_STORE_DIR}
+      # Outbound SMTP relay + dev whitelist (settings/esp.go). Root .env
+      # points these at the dev mailpit (sr-mailhog) or a real ESP in prod.
+      MAILGUN_ADDRESS: ${MAILGUN_ADDRESS}
+      MAILGUN_USERNAME: ${MAILGUN_USERNAME}
+      MAILGUN_PASSWORD: ${MAILGUN_PASSWORD}
+      MAILGUN_HOST: ${MAILGUN_HOST}
+      EMAIL_WHITELIST: ${EMAIL_WHITELIST}
     volumes:
       - email_data:${EMAIL_STORE_DIR}
     restart: unless-stopped
     depends_on:
-      - rs-users
-      - rs-notes
+      # sr-email only calls RS-RESPONSES (forwarding). It does not talk to
+      # rs-users/rs-notes — that dependency was cargo-culted and could
+      # deadlock startup if either service is slow to come up.
+      - rs-responses
 
   sr-next:
     container_name: sr-next

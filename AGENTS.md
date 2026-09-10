@@ -259,6 +259,22 @@ from it, not written by hand.
    middleware-table style; all modules use the same pattern once migrated to
    OpenAPI.
 
+5. **Address entities, not lists.** Paths follow `/{module}/{entity}/{key}/{action}`:
+   the entity is what you address, the key is its `MakeKey()`, the action is the
+   operation. **Creation is container-bounded** — you create a resource *in* its
+   container (`POST /responses/note/{noteKey}/reaction`), never at a bare
+   top-level create route. **Mutation is entity-bounded** — `PUT`/`DELETE` target
+   the entity key directly (`PUT /responses/reply/{replyKey}`). **Retrieval is
+   both** — plural = collection scoped to the container
+   (`GET .../note/{noteKey}/replies`), singular = the item
+   (`GET .../reply/{replyKey}`).
+
+6. **Reserve the words.** `event` is reserved for future note components
+   (calendar entry, task) — system-wide signals (email pixels, notification
+   cursors) use `signals` and live on an internal-token surface. New kinds of
+   per-note facts are reactions with an open `kind` set; adding one must not
+   require a schema or API change.
+
 ### Code generation
 
 ```bash
@@ -288,6 +304,22 @@ module that has an OpenAPI spec.
 - **Test files follow the surface they cover** (`groupsinfo_test.go`), not
   `handlers_test.go`; shared helpers live in `pkg/dbtest/`.
 
+### Response semantics (RESPONSES vocabulary)
+
+Ontology only — path construction follows the general rules in "Design
+principles" #5.
+
+- A **note** is a container; **entities** live inside it (`reply` today;
+  `event`, `task`, `offer` later) — each minted with its own `MakeKey()`.
+- A **reply** is content owned by RESPONSES; a **reaction** is a per-user
+  signal on a note or an entity. Reactions are an **open kind set** — new
+  kinds must not require a schema, column, or API change; per-kind
+  validation/processing lives server-side (processor dispatcher, see
+  RESPONSES issues/0002).
+- Every reaction write is paired with the caller's `response_participation`
+  row `(noteKey, userKey)`, resolved from the session context (X-User-Key) —
+  never derived from the note's sender.
+
 ### Migration status
 
 - **Live OpenAPI surfaces** (each has a generated `server.gen.go`, handler
@@ -298,6 +330,8 @@ module that has an OpenAPI spec.
   - NOTES `/notes/{noteKey}` (detail), `/notes/user/{userKey}` (list),
     `/notes/group/{groupKey}` (group list)
 - **Planned**: USERS login (`/users/login` + magic-key redeem), RESPONSES
-  batch stats, later mutations/cap routes.
+  batch stats, later mutations/cap routes — RESPONSES reaction/
+  reply mutations (`POST /responses/note/{noteKey}/reaction`, `.../reply`)
+  replacing the legacy cap-key routes.
 - **End state**: GraphQL layer in ORCHESTRATOR is removed once all
   migrated endpoints have REST equivalents.
