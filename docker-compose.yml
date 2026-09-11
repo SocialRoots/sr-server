@@ -59,6 +59,10 @@ services:
       POSTGRES_DB_NAME: ${DB_NAME_USERS}
       PASSWORD_COST: ${PASSWORD_COST}
       SIGNING_KEY: ${SIGNING_KEY}
+      # Allow-list of public frontend origins permitted to request login
+      # emails (read by rs-users; empty = loopback only outside production,
+      # nothing allowed in production).
+      ALLOWED_LOGIN_ORIGINS: ${ALLOWED_LOGIN_ORIGINS}
       # S3 config is env-driven: point S3_HOST/AWS_* at AWS S3 today, or at a
       # future local MinIO (see docker-compose.minio.yml) without compose changes.
       AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
