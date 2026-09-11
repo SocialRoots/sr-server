@@ -1,0 +1,50 @@
+# Standalone sr-web sidecar — NOT part of the sr-server stack. The sr-web
+# experiment is deployed manually, on top of the existing Traefik + infra-web
+# network, at a subdomain of the main public host.
+#
+# Usage (from sr-server root, .env provides SR_PUBLIC_HOST + VERSION):
+#   docker compose -f docker-compose.sr-web.yml up -d     # start sidecar
+#   docker compose -f docker-compose.sr-web.yml down      # stop sidecar
+#
+# Public exposure, port-conflict free: the container publishes NO host port.
+# Traefik matches Host web.${SR_PUBLIC_HOST} on :443 and proxies to the
+# container over infra-web by DNS name (internal :80). No `ports:` exists —
+# so nothing collides with sr-next :3000, orchestrator :8080, etc.
+#
+# API: /api/* on the subdomain is forwarded at Traefik level to the existing
+# sr-orc service (defined by the main stack's labels, same mechanism as the
+# sr-orc-query router). The sidecar UI still serves statically if the main
+# stack is down; its API calls then fail at Traefik with 503 until it's up.
+name: sr-web-sidecar
+
+services:
+  sr-web:
+    image: ghcr.io/socialroots/sr-web:${VERSION}
+    container_name: sr-web
+    restart: unless-stopped
+    environment:
+      # Runtime config, read at container BOOT (rendered into config.js by
+      # entrypoint.sh) — same start-time pattern as sr-next. Same-origin so
+      # Traefik's /api passthrough below applies. Value comes from .env's
+      # SR_API_PREFIX (=/api); with the default .env this renders '/api'.
+      API_BASE: ${SR_API_PREFIX}
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      # Main route: web.${SR_PUBLIC_HOST}
+      - "traefik.http.routers.sr-web.rule=Host(`web.${SR_PUBLIC_HOST}`)"
+      - "traefik.http.routers.sr-web.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sr-web.priority=60"
+      - "traefik.http.services.sr-web.loadbalancer.server.port=80"
+      # API passthrough → existing orchestrator service (defined in the main
+      # stack's labels). Must beat the generic web rule (60) for /api paths.
+      - "traefik.http.routers.sr-web-api.rule=Host(`web.${SR_PUBLIC_HOST}`) && PathPrefix(`/api/`)"
+      - "traefik.http.routers.sr-web-api.priority=99"
+      - "traefik.http.routers.sr-web-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sr-web-api.service=sr-orc"
+
+networks:
+  web:
+    name: infra-web
+    external: true

@@ -180,6 +180,21 @@ services:
     networks:
       - sr-network
 
+  sr-web:
+    # sr-web experiment — NOT part of the prod stack. Builds from source here
+    # so dev tracks the working tree; deploy separately as a Traefik sidecar
+    # with docker-compose.sr-web.yml. The dev UI is host-published at
+    # ${WEB_DEV_PORT} (default 8081); its API calls go from the browser
+    # straight to localhost:8080 (orchestrator, host-published in base).
+    build: modules/SR-WEB
+    networks:
+      - sr-network
+    ports:
+      - "${WEB_DEV_PORT:-8081}:80"
+    environment:
+      # Dev: browser calls the host-published orchestrator directly.
+      API_BASE: http://localhost:${SR_ORCHESTRATOR_PORT}${SR_API_PREFIX}
+
 volumes:
   postgres_data:
     driver: local

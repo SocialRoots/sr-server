@@ -36,3 +36,6 @@
 [submodule "modules/SR-NEXT"]
 	path = modules/SR-NEXT
 	url = git@github.com:SocialRoots/sr-next.git
+[submodule "modules/SR-WEB"]
+	path = modules/SR-WEB
+	url = git@github.com:SocialRoots/sr-web.git
