@@ -181,11 +181,12 @@ services:
       - sr-network
 
   sr-web:
-    # sr-web experiment — NOT part of the prod stack. Builds from source here
-    # so dev tracks the working tree; deploy separately as a Traefik sidecar
-    # with docker-compose.sr-web.yml. The dev UI is host-published at
-    # ${WEB_DEV_PORT} (default 8081); its API calls go from the browser
-    # straight to localhost:8080 (orchestrator, host-published in base).
+    # sr-web builds from source here so dev tracks the working tree (the base
+    # stack pulls the ghcr image; the traefik overlay routes it). The dev UI
+    # is host-published at ${WEB_DEV_PORT} (default 8081); its API calls go
+    # from the browser straight to localhost:8080 (orchestrator, host-published
+    # in base).
+    image: ghcr.io/socialroots/sr-web:${VERSION}
     build: modules/SR-WEB
     networks:
       - sr-network

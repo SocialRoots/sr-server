@@ -30,6 +30,14 @@ services:
       - "traefik.http.routers.sr-orc-query.priority=70"
       - "traefik.http.routers.sr-orc-query.tls.certresolver=letsencrypt"
       - "traefik.http.routers.sr-orc-query.service=sr-orc"
+      # web.<host> API passthrough — transitional until api.<host> lands
+      # (issues/0003). Lives on the ORCHESTRATOR container (not sr-web's):
+      # label-defined services are scoped to their own container, so a router
+      # on sr-web could never resolve sr-orc@docker.
+      - "traefik.http.routers.sr-web-api.rule=Host(`web.${SR_PUBLIC_HOST}`) && PathPrefix(`/api/`)"
+      - "traefik.http.routers.sr-web-api.priority=99"
+      - "traefik.http.routers.sr-web-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sr-web-api.service=sr-orc"
     networks:
       - sr-internal
       - db
@@ -95,6 +103,17 @@ services:
       - "traefik.http.routers.sr-next-build-id.rule=Host(`${SR_PUBLIC_HOST}`) && PathPrefix(`/api/build-id`)"
       - "traefik.http.routers.sr-next-build-id.tls.certresolver=letsencrypt"
       - "traefik.http.routers.sr-next-build-id.priority=100"
+    networks:
+      - sr-internal
+      - web
+
+  sr-web:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sr-web.rule=Host(`web.${SR_PUBLIC_HOST}`)"
+      - "traefik.http.routers.sr-web.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.sr-web.priority=60"
+      - "traefik.http.services.sr-web.loadbalancer.server.port=80"
     networks:
       - sr-internal
       - web

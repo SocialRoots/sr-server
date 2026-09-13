@@ -185,12 +185,30 @@ services:
       # into the image at build time. Consumed via publicRuntimeConfig in
       # modules/SR-NEXT/next.config.js (see sr-next/.env.model).
       HOSTNAME: "0.0.0.0"
+      # Standalone server binds process.env.PORT (default 3000) — keep in
+      # sync with the host mapping and the Traefik target port below.
+      PORT: ${SR_NEXT_PORT}
       POSTHOG_TOKEN: ${POSTHOG_TOKEN}
       POSTHOG_HOST: ${POSTHOG_HOST}
       POLL_INTERVAL: ${POLL_INTERVAL}
       CONNECT_ORG_FORM_LINK: ${CONNECT_ORG_FORM_LINK}
     ports:
-      - "3000:3000"
+      - "${SR_NEXT_PORT}:${SR_NEXT_PORT}"
+    depends_on:
+      - orchestrator
+
+  # sr-web — the next-gen UI, replaces sr-next (see issues/0003). In the base
+  # stack so it deploys with everything else; the traefik overlay adds routing
+  # and networks, the dev overlay adds a host port + build.
+  sr-web:
+    container_name: sr-web
+    restart: unless-stopped
+    image: ghcr.io/socialroots/sr-web:${VERSION}
+    environment:
+      # Runtime config rendered into config.js by entrypoint.sh. Host-relative
+      # while the /api passes through the web.<host> router; the traefik
+      # overlay overrides this with the api.<host> origin once 0003 lands.
+      API_BASE: ${SR_API_PREFIX}
     depends_on:
       - orchestrator
 
